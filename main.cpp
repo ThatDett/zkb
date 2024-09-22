@@ -3,9 +3,9 @@
 #include <string>
 #include <filesystem>
 
-#include "CommandHandle.hpp"
+#include "CommandHandler.hpp"
 
 int main(int argc, char** argv)
 {
-    CommandHandle(argv, argc);
+    CommandHandler commandHandler(argv, argc);
 }
