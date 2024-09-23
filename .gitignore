@@ -1,3 +1,5 @@
 *.bat
 build/
 build
+.cache/
+organizing.txt

@@ -5,10 +5,14 @@ project(zkb)
 set(FILE_SOURCES 
     main.cpp 
     src/CommandHandler.cpp
+    src/DirectoryHandler.cpp
+    src/Application.cpp
 )
 
 set(CMAKE_CXX_STANDARD 20)
 set(DEBUG_BUILD 1)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Define optimization flags based on build type
 if(${DEBUG_BUILD} EQUAL 1)

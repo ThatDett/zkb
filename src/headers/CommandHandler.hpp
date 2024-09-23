@@ -1,33 +1,40 @@
 #ifndef COMMAND_HANDLE_HPP
 #define COMMAND_HANDLE_HPP
+#include <array>
 #include <string>
-#include <vector>
 #include <filesystem>
+#include <unordered_map>
+
+#include "Directory.hpp"
 
 class CommandHandler
 {
 public:
-    CommandHandler(char** argv, int argc);
+    static constexpr int MAX_ARGS = 5;
+    using ArgvT = std::array<std::string, MAX_ARGS>;
 
-private: 
+   CommandHandler(ArgvT&);
+
+    void Handle(int argc);
+    static auto GetDirInfo(const std::string& = zkb::fs::current_path().string()) -> zkb::Directory&;
+
+private:
+    ArgvT& argv;
+    int    argc;
+
     enum class Command
     {
         Line,
         None
     };
 
+    void WrongUsage(Command, bool crash = false);
+
     void HandleNewLine();
     void HandleLineDelete();
 
-    void WrongUsage(Command);
-    void UpdateNumberOfDirs();
-
-    std::vector<std::string> argv;
-    int                      argc;
-
-    std::filesystem::directory_iterator dirIt{std::filesystem::current_path()};
-    uint64_t lineNumber   = 0;
-    uint64_t numberOfDirs = 0;
+    void ListCurrentDirectory();
+    void ChangeDirectory(zkb::fs::path);
 };
 
 #endif

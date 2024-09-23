@@ -3,9 +3,10 @@
 #include <string>
 #include <filesystem>
 
-#include "CommandHandler.hpp"
+#include "Application.hpp"
 
 int main(int argc, char** argv)
 {
-    CommandHandler commandHandler(argv, argc);
+    Application app(argv, argc);
+    app.Run();
 }

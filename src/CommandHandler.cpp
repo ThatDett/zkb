@@ -5,36 +5,32 @@
 #include <filesystem>
 
 #include "CommandHandler.hpp"
+#include "Directory.hpp"
 
 namespace fs = std::filesystem;
+using    Dir = zkb::Directory;
 
-void CommandHandler::WrongUsage(Command command)
+void 
+CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
 {
-    std::cout << "Wrong usage\n";
-    exit(EXIT_FAILURE);
+    std::cerr << "Wrong usage\n";
+    if (crash) exit(EXIT_FAILURE);
 }
 
+CommandHandler::CommandHandler(ArgvT& _argv) : argv(_argv) {}
 
-CommandHandler::CommandHandler(char** _argv, int _argc) :
-    argc(_argc)
+void 
+CommandHandler::Handle(int _argc)
 {
+    argc = _argc;
+    auto& commandStr = argv.at(0);
+    if (commandStr == "quit" || commandStr == "q") exit(EXIT_SUCCESS);
+
     Command command = Command::None;
-    if (argc == 1) { WrongUsage(command); }
+    if (argc == 0) { WrongUsage(command); }
 
-    argv.reserve(argc);
-    for (int i = 0; i < argc; ++i)
-    {
-        argv.emplace_back(_argv[i]);
-    }
-
-    for (const auto& str : argv)
-    {
-        std::cout << str << std::endl;
-    }
-
-
-    std::string commandStr(argv[1]);
     for (char& c : commandStr) { c = std::tolower(c); }
+
     if (commandStr == "l")
     {
         HandleNewLine();
@@ -43,58 +39,94 @@ CommandHandler::CommandHandler(char** _argv, int _argc) :
     {
         HandleLineDelete();
     }
-    else if (commandStr == "build")
+    else if (commandStr == "build" || commandStr == "b")
     {
         assert(false && "Not implemented");
+    }
+    else if (commandStr == "ls")
+    {
+        ListCurrentDirectory();
+    }
+    else if (commandStr == "cd")
+    {
+        ChangeDirectory(argv.at(1));
     }
     else
     {
         WrongUsage(Command::None);
     }
+
+    for (int i = 0; i < argc; i += 1) argv.at(i) = "null";
+    std::cout << fs::current_path().string() << "> ";
 }
 
-void CommandHandler::UpdateNumberOfDirs()
+void 
+CommandHandler::HandleNewLine()
 {
-    numberOfDirs = 0;
-    for (const auto& throwaway : fs::directory_iterator(fs::current_path()))
-    {
-        numberOfDirs += 1;            
-    }
-}
+    std::string lineNumberStr = "0";
 
-void CommandHandler::HandleNewLine()
-{
-    char lineNumberChar;
-    UpdateNumberOfDirs();
-
-    {size_t i = 0;
-    for (const auto& dir : dirIt)
+    const auto& parent = GetDirInfo();
+    std::cout << dirInfo.numberOfDirs << std::endl;
+    
+    int lineNumber = 0;
+    if (argc == 2)
     {
-        std::cout << dir << '\n';
-       
-        //TODO: Parse line number correctly and convert to uint
-        if (i == numberOfDirs - 1)
+        if (!fs::is_empty(fs::current_path()))
         {
-            const auto& str = dir.path().filename().string();
-            lineNumberChar = str.at(0);
-            lineNumber = lineNumberChar - '0';
+            /* Get the lineNumber of the last create one that is one greater and
+
+            */
+            const auto& lastDir = Dir::DirectoryInLine(parent.numberOfDirs);
+            lineNumber = lastDir.lineNumber + 1;
+
+            lineNumberStr = std::to_string(lineNumber) + " ";
             std::cout << "lineNumber: " << lineNumber << '\n';
         }
-        i += 1; 
-    }}
+    }
+    else
+    {
 
-    lineNumberChar += 1;
-    fs::create_directory(argv[2].insert(0, 1, lineNumberChar).insert(1, 1, ' '));
+    }
+
+    Dir::CreateDirectory(argv.at(1).insert(0, lineNumberStr));
 }
 
-void CommandHandler::HandleLineDelete()
+void 
+CommandHandler::HandleLineDelete()
 {
     int lineNum = argv[2].at(0) - '0';
-    for (const auto& dir : dirIt)
+    (void) lineNum;
+    for (const auto& dir : Dir::PathIterator())
     {
         if (dir.path().filename().string().at(0) == argv.at(2).at(0))
         {
-            fs::remove(dir.path());
+            if (fs::is_empty(dir.path())) 
+            {
+                fs::remove(dir.path());
+            }
+            else
+            {
+                std::cerr << "Not empty. And I haven't implemented deleting non-empty folders";
+                exit(EXIT_FAILURE);
+            }
         }
     }
 }
+
+void 
+CommandHandler::ListCurrentDirectory()
+{
+    std::cout << '\n';
+    for (const auto& dir : Dir::PathIterator())
+    {
+        std::cout << "\t\t\t\t" << dir.path().filename().string() << '\n';
+    }
+    std::cout << '\n';
+}
+
+void
+CommandHandler::ChangeDirectory(fs::path path)
+{
+    fs::current_path(path);
+}
+
