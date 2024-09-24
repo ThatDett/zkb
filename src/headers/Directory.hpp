@@ -7,9 +7,10 @@
 
 namespace zkb
 {
-    namespace fs = std::filesystem;
-    using String = const std::string&;
-    using Path   = const fs::path&;
+    namespace fs   = std::filesystem;
+    using String   = const std::string&;
+    using Path     = const fs::path&;
+    using DirEntry = const fs::directory_entry&;
 
     class Directory
     {
@@ -19,7 +20,8 @@ namespace zkb
  
         static auto GetDirectoryLineNumber(Path = fs::current_path()) -> uint64_t;
         static auto GetDirectoryName(Path = fs::current_path())       -> std::string;
-        static void ChangeDirectoryLineNumber(const fs::directory_entry& dir, uint64_t offset);
+        static void ChangeDirectoryLineNumber(DirEntry, uint64_t offset);
+        static void RecursivelyDelete(DirEntry);
 
         static auto CreateDirectory(String)
             -> bool;

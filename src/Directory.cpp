@@ -6,7 +6,7 @@
 #include "Directory.hpp"
 
 using Directory = zkb::Directory;
-using String    = const std::string&;
+using String    = zkb::String;
 namespace fs = zkb::fs;
 
 auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
@@ -28,6 +28,33 @@ bool
 Directory::CreateDirectory(String name)
 {
     return fs::create_directory(name);
+}
+
+void
+Directory::RecursivelyDelete(zkb::DirEntry dir)
+{
+    if (fs::is_empty(dir))
+    {
+        // const auto& parent     = dir.path().parent_path();
+        // uint64_t    lineNumber; 
+        //
+        // for (const auto& elem : fs::directory_iterator{parent})
+        // {
+        //     lineNumber = GetDirectoryLineNumber(elem);
+        //     if (lineNumber >= GetDirectoryLineNumber(dir))
+        //     {
+        //         ChangeDirectoryLineNumber(elem, lineNumber - 1);
+        //     }
+        // }
+
+        fs::remove(dir);
+        return;
+    }
+    
+    for (const auto& elem : fs::recursive_directory_iterator{dir})
+    {
+        RecursivelyDelete(elem);
+    }
 }
 
 uint64_t 

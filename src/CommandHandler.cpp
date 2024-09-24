@@ -154,19 +154,8 @@ CommandHandler::HandleLineDelete()
         } break;
         default: WrongUsage(Command::Remove); break;
     }
-
-    if (fs::is_empty(dir))
-    {
-
-        fs::remove(dir);
-    }
-    else 
-    {
-        for (const auto& elem : fs::recursive_directory_iterator{dir})
-        {
-            fs::remove(elem);
-        }
-    }
+    
+    Dir::RecursivelyDelete(dir);
 }
 
 void 
