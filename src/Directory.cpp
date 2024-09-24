@@ -1,64 +1,70 @@
+#include <cstdint>
 #include <filesystem>
-#include <unordered_map>
+#include <iostream>
+#include <string>
 
 #include "Directory.hpp"
 
 using Directory = zkb::Directory;
+using String    = const std::string&;
 namespace fs = zkb::fs;
 
-static std::unordered_map<std::string, Directory> directoryMap;
-
-auto Directory::DirectoryInLine(const std::string& path, uint64_t index) -> Directory&
+auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
 {
-    return directoryMap.at(path + std::to_string(index));
+    for (const auto& elem : PathIterator())
+    {
+        if (!elem.is_directory()) break;
+        if (GetDirectoryLineNumber(elem) == lineNumber) return elem;
+    }
+
+    std::cerr << "Acessing non-existant line number " << lineNumber <<
+    " in "  << fs::current_path().string() << "\nThis path has "    << 
+    GetNumberOfDirs() << " directories ";
+
+    return fs::directory_entry{"-1"};
 }
 
 bool
-Directory::CreateDirectory(const std::string& name)
+Directory::CreateDirectory(String name)
 {
-    auto& parent = GetDirInfo();
-
-    parent.numberOfDirs += 1;
-    directoryMap.insert(std::make_pair(
-                            parent.path.string() + name.substr(0, name.find(' ')),
-                            Directory{
-                                .numberOfDirs = 0,
-                                .path = fs::path(parent.path.string() + name)
-                            }
-                        ));
-                            
     return fs::create_directory(name);
 }
 
 uint64_t 
 Directory::GetNumberOfDirs()
 {
-    if (fs::is_empty(fs::current_path())) return 0;
-    int numberOfDirs = 0;
-
-    for (const auto& _ : PathIterator())
+    uint64_t numberOfDirs = 0;
+    for (const auto& elem : PathIterator())
     {
-        (void)_;
-        numberOfDirs += 1;            
+        if (elem.is_directory()) numberOfDirs += 1;
     }
+
     return numberOfDirs;
 }
 
-auto
-Directory::GetDirInfo(const fs::path& path) -> zkb::Directory&
+uint64_t
+Directory::GetDirectoryLineNumber(Path path)
 {
-    if (!directoryMap.contains(path))
-    {
-        directoryMap.insert(std::make_pair(
-                                path, 
-                                zkb::Directory{
-                                    .numberOfDirs = GetNumberOfDirs(path),
-                                    .lineNumber   = 0
-                                 }
-                             )
-                         );
-    }
-    return directoryMap.at(path);
+    String dir = path.filename().string();
+    return std::stoi(dir.substr(0, dir.find(' ')));
+}
+
+std::string
+Directory::GetDirectoryName(Path path)
+{
+    String dir = path.filename().string();
+    return dir.substr(dir.find(' '), dir.size());
+}
+
+void
+Directory::ChangeDirectoryLineNumber(const fs::directory_entry& elem, uint64_t number)
+{
+    if (!elem.is_directory()) return;
+    const auto& fullDirName = std::to_string(number) + GetDirectoryName(elem.path());
+    const auto& path        = fs::current_path().string() + "\\" + fullDirName;
+
+    std::error_code err;
+    fs::rename(elem.path(), path, err);
 }
 
 auto

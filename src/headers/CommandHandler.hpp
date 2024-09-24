@@ -1,9 +1,10 @@
-#ifndef COMMAND_HANDLE_HPP
-#define COMMAND_HANDLE_HPP
+#ifndef COMMAND_HANDLER_HPP
+#define COMMAND_HANDLER_HPP
+
 #include <array>
+#include <cstdint>
 #include <string>
 #include <filesystem>
-#include <unordered_map>
 
 #include "Directory.hpp"
 
@@ -13,28 +14,31 @@ public:
     static constexpr int MAX_ARGS = 5;
     using ArgvT = std::array<std::string, MAX_ARGS>;
 
-   CommandHandler(ArgvT&);
+    CommandHandler();
 
-    void Handle(int argc);
-    static auto GetDirInfo(const std::string& = zkb::fs::current_path().string()) -> zkb::Directory&;
+    void Handle();
 
 private:
-    ArgvT& argv;
-    int    argc;
+    struct ArgT
+    {
+        ArgvT    v;
+        uint32_t c;
+    } arg;
 
     enum class Command
     {
         Line,
+        Remove,
         None
     };
 
-    void WrongUsage(Command, bool crash = false);
+    void WrongUsage(Command, bool crash = false) const;
 
     void HandleNewLine();
     void HandleLineDelete();
 
     void ListCurrentDirectory();
-    void ChangeDirectory(zkb::fs::path);
+    void ChangeDirectory(const zkb::fs::path&);
 };
 
 #endif

@@ -1,33 +1,67 @@
 #include <cassert>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
+#include <string>
 
 #include "CommandHandler.hpp"
 #include "Directory.hpp"
+#include "Utils.hpp"
 
 namespace fs = std::filesystem;
 using    Dir = zkb::Directory;
 
 void 
-CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
+CommandHandler::WrongUsage(Command command, bool crash /* = false*/) const
 {
     std::cerr << "Wrong usage\n";
     if (crash) exit(EXIT_FAILURE);
 }
 
-CommandHandler::CommandHandler(ArgvT& _argv) : argv(_argv) {}
+CommandHandler::CommandHandler()
+{
+    std::string command;
+    
+    std::cout << fs::current_path().string() << "> ";
+    while (std::getline(std::cin, command))
+    {
+        command += ' ';
+        size_t pos     = command.find(' ');
+        size_t wordBeg = 0;
+
+        //Splitting
+        arg.c = 0;
+        for (; pos != std::string::npos; arg.c += 1)
+        {
+            if (arg.c > CommandHandler::MAX_ARGS)
+            {
+                std::cerr << "Too many args. argc = " << arg.c << "\n";
+                exit(EXIT_FAILURE);
+            }
+            
+            const auto& subStr = command.substr(wordBeg, pos - wordBeg);
+            arg.v.at(arg.c) = subStr;
+            wordBeg = pos + 1;
+
+            auto nextPos = command.find(' ', wordBeg);
+            pos = nextPos;
+        }
+
+        std::cerr << arg.v.at(2) << '\n';
+        Handle();
+    }
+}
 
 void 
-CommandHandler::Handle(int _argc)
+CommandHandler::Handle()
 {
-    argc = _argc;
-    auto& commandStr = argv.at(0);
+    auto& commandStr = arg.v.at(0);
     if (commandStr == "quit" || commandStr == "q") exit(EXIT_SUCCESS);
 
     Command command = Command::None;
-    if (argc == 0) { WrongUsage(command); }
+    if (arg.c == 0) { WrongUsage(command); }
 
     for (char& c : commandStr) { c = std::tolower(c); }
 
@@ -39,7 +73,7 @@ CommandHandler::Handle(int _argc)
     {
         HandleLineDelete();
     }
-    else if (commandStr == "build" || commandStr == "b")
+    else if (commandStr == "b")
     {
         assert(false && "Not implemented");
     }
@@ -49,66 +83,88 @@ CommandHandler::Handle(int _argc)
     }
     else if (commandStr == "cd")
     {
-        ChangeDirectory(argv.at(1));
+        ChangeDirectory(arg.v.at(1));
     }
     else
     {
         WrongUsage(Command::None);
     }
 
-    for (int i = 0; i < argc; i += 1) argv.at(i) = "null";
+    //for (int i = 0; i < arg.c; i += 1) arg.v.at(i) = "null";
     std::cout << fs::current_path().string() << "> ";
 }
 
 void 
 CommandHandler::HandleNewLine()
 {
-    std::string lineNumberStr = "0";
+    std::string lineNumberStr;
 
-    const auto& parent = GetDirInfo();
-    std::cout << dirInfo.numberOfDirs << std::endl;
-    
-    int lineNumber = 0;
-    if (argc == 2)
+    switch (arg.c)
     {
-        if (!fs::is_empty(fs::current_path()))
+        case 2:
         {
-            /* Get the lineNumber of the last create one that is one greater and
+            uint64_t    numberOfLines = Dir::GetNumberOfDirs();
+            lineNumberStr = std::to_string(numberOfLines + 1) + " ";
+            std::cout << "lineNumber: " << numberOfLines << '\n';
+            Dir::CreateDirectory(arg.v.at(1).insert(0, lineNumberStr));
+        } break;
+        case 3:
+        {
+            if (!zkb::IsInteger(arg.v.at(2)))
+            {
+                std::cerr << "Not passing an integer for line number\n";
+                exit(EXIT_FAILURE);
+            }
 
-            */
-            const auto& lastDir = Dir::DirectoryInLine(parent.numberOfDirs);
-            lineNumber = lastDir.lineNumber + 1;
+            for (auto& elem : Dir::PathIterator())
+            {
+                auto lineNumber = Dir::GetDirectoryLineNumber(elem.path());
 
-            lineNumberStr = std::to_string(lineNumber) + " ";
-            std::cout << "lineNumber: " << lineNumber << '\n';
-        }
+                if (lineNumber >= std::stoll(arg.v.at(2)))
+                {
+                    Dir::ChangeDirectoryLineNumber(elem, lineNumber + 1);
+                }
+            }
+
+            Dir::CreateDirectory(arg.v.at(1).insert(0, arg.v.at(2) += ' '));
+        } break;
+        default: WrongUsage(Command::Line); break;
     }
-    else
-    {
-
-    }
-
-    Dir::CreateDirectory(argv.at(1).insert(0, lineNumberStr));
 }
 
 void 
 CommandHandler::HandleLineDelete()
 {
-    int lineNum = argv[2].at(0) - '0';
-    (void) lineNum;
-    for (const auto& dir : Dir::PathIterator())
+    fs::directory_entry dir;
+    switch (arg.c)
     {
-        if (dir.path().filename().string().at(0) == argv.at(2).at(0))
+        case 1:
         {
-            if (fs::is_empty(dir.path())) 
+            dir = Dir::DirectoryInLine(Dir::GetNumberOfDirs()); 
+        } break;
+        case 2:
+        {
+            if (!zkb::IsInteger(arg.v.at(1)))
             {
-                fs::remove(dir.path());
-            }
-            else
-            {
-                std::cerr << "Not empty. And I haven't implemented deleting non-empty folders";
+                std::cerr << "Not passing an integer for line number\n";
                 exit(EXIT_FAILURE);
             }
+
+            dir = Dir::DirectoryInLine(std::stoll(arg.v.at(1))); 
+        } break;
+        default: WrongUsage(Command::Remove); break;
+    }
+
+    if (fs::is_empty(dir))
+    {
+
+        fs::remove(dir);
+    }
+    else 
+    {
+        for (const auto& elem : fs::recursive_directory_iterator{dir})
+        {
+            fs::remove(elem);
         }
     }
 }
@@ -125,7 +181,7 @@ CommandHandler::ListCurrentDirectory()
 }
 
 void
-CommandHandler::ChangeDirectory(fs::path path)
+CommandHandler::ChangeDirectory(const fs::path& path)
 {
     fs::current_path(path);
 }

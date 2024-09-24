@@ -6,7 +6,8 @@ class Application
 public:
     Application(char** argv, int argc);
 
-    void Run();
+    void RunTooling();
+    void Build();
 
 private:
     char** argv;

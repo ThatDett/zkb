@@ -4,26 +4,32 @@
 #include <cstdint>
 #include <string>
 #include <filesystem>
-#include <unordered_map>
 
 namespace zkb
 {
     namespace fs = std::filesystem;
+    using String = const std::string&;
+    using Path   = const fs::path&;
+
     class Directory
     {
     public:
-        auto DirectoryInLine(uint64_t) -> Directory&;
+        static auto DirectoryInLine(uint64_t) 
+            -> fs::directory_entry;
+ 
+        static auto GetDirectoryLineNumber(Path = fs::current_path()) -> uint64_t;
+        static auto GetDirectoryName(Path = fs::current_path())       -> std::string;
+        static void ChangeDirectoryLineNumber(const fs::directory_entry& dir, uint64_t offset);
 
-        static bool CreateDirectory(const std::string&);
-        static auto GetNumberOfDirs() -> uint64_t;
-        static auto PathIterator()    -> zkb::fs::directory_iterator const;
-        static auto GetDirInfo(const fs::path& str = fs::current_path()) -> Directory&;
+        static auto CreateDirectory(String)
+            -> bool;
 
-        uint64_t numberOfDirs = 0;
-        uint64_t lineNumber   = 0;
-        fs::path path;
+        static auto GetNumberOfDirs() 
+            -> uint64_t;
+        
+        static auto PathIterator()
+            -> fs::directory_iterator const;
 
-        static std::unordered_map<fs::path, Directory> directoryMap;
     };
 }
 

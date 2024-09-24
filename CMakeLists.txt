@@ -4,8 +4,9 @@ project(zkb)
 
 set(FILE_SOURCES 
     main.cpp 
+    src/Utils.cpp
     src/CommandHandler.cpp
-    src/DirectoryHandler.cpp
+    src/Directory.cpp
     src/Application.cpp
 )
 
