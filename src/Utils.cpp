@@ -10,3 +10,8 @@ bool zkb::IsInteger(const std::string& str)
 
     return true;
 }
+
+void zkb::ToLower(std::string& string)
+{
+    for (char& ch : string) ch = std::tolower(ch);
+}

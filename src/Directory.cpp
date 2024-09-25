@@ -19,9 +19,9 @@ auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
 
     std::cerr << "Acessing non-existant line number " << lineNumber <<
     " in "  << fs::current_path().string() << "\nThis path has "    << 
-    GetNumberOfDirs() << " directories ";
+    GetNumberOfDirs() << " directories.\n";
 
-    return fs::directory_entry{"-1"};
+    return fs::directory_entry{"null"};
 }
 
 bool
@@ -92,6 +92,10 @@ Directory::ChangeDirectoryLineNumber(const fs::directory_entry& elem, uint64_t n
 
     std::error_code err;
     fs::rename(elem.path(), path, err);
+    if (err)
+    {
+        std::cerr << "Can't change directory number\n";
+    }
 }
 
 auto

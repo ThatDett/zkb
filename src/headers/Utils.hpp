@@ -6,6 +6,7 @@
 namespace zkb
 {
     bool IsInteger(const std::string&);
+    void ToLower(std::string&);
 }
 
 #endif

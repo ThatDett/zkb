@@ -35,10 +35,16 @@ private:
     void WrongUsage(Command, bool crash = false) const;
 
     void HandleNewLine();
-    void HandleLineDelete();
+    void HandleLineDelete(bool forceDelete = false);
+    void HandleLineChange();
 
+    void ShowStatus();
     void ListCurrentDirectory();
+
     void ChangeDirectory(const zkb::fs::path&);
+    void ChangeDirectory(const uint64_t& lineNumber);
+
+    void DebugRefresh();
 };
 
 #endif
