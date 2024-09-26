@@ -1,5 +1,4 @@
 *.bat
 build/
-build
 .cache/
-organizing.txt
+commands.txt

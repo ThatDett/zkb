@@ -6,19 +6,16 @@
 #include <string>
 #include <filesystem>
 
-#include "Directory.hpp"
-
 class CommandHandler
 {
 public:
-    static constexpr int MAX_ARGS = 5;
-    using ArgvT = std::array<std::string, MAX_ARGS>;
 
     CommandHandler();
 
     void Handle();
 
-private:
+    static constexpr int MAX_ARGS = 5;
+    using ArgvT = std::array<std::string, MAX_ARGS>;
     struct ArgT
     {
         ArgvT    v;
@@ -32,19 +29,24 @@ private:
         None
     };
 
-    void WrongUsage(Command, bool crash = false) const;
+    static void WrongUsage(Command, bool crash = false);
 
+private:
     void HandleNewLine();
     void HandleLineDelete(bool forceDelete = false);
     void HandleLineChange();
+    void HandleUndo();
+    void HandleRedo();
 
     void ShowStatus();
     void ListCurrentDirectory();
 
-    void ChangeDirectory(const zkb::fs::path&);
+    void ChangeDirectory(const std::filesystem::path&);
     void ChangeDirectory(const uint64_t& lineNumber);
 
     void DebugRefresh();
+private:
+    std::filesystem::path basedPath;
 };
 
 #endif
