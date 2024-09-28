@@ -1,4 +1,3 @@
 *.bat
 build/
 .cache/
-commands.txt

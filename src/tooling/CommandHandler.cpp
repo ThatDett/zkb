@@ -4,7 +4,9 @@
 #include <cstdlib>
 #include <iostream>
 #include <filesystem>
+#include <iterator>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "CommandHandler.hpp"
@@ -54,6 +56,8 @@ CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
     }
     if (crash) exit(EXIT_FAILURE);
 }
+
+fs::path CommandHandler::basedPath = fs::current_path();
 
 CommandHandler::CommandHandler()
 {
@@ -192,47 +196,97 @@ void
 CommandHandler::HandleNewLine()
 {
     std::string  lineNumberStr;
-    std::string  textArg       = arg.v.at(1);
-    std::string& lineNumberArg = arg.v.at(2);
+    std::string  finalText;
+    std::string& textArg       = arg.v.at(1);
+    std::string* lineNumberArg = &arg.v.at(2);
 
-    std::cout << "Parent: " << basedPath.parent_path().string() << '\n';
-    std::cout << "Create " << textArg << " at " << lineNumberArg << "\n";
+    constexpr char stringChar = '"';
+    const bool isStringText = textArg.starts_with(stringChar);
+
+    if (isStringText)
+    {
+        textArg = textArg.substr(1, textArg.size() - 1);
+
+        auto beg = std::next(std::begin(arg.v));
+
+        uint32_t originalArgc = arg.c;
+        for (uint32_t i = 0; i < originalArgc - 1; ++beg, i += 1)
+        {
+            const auto& elem = *beg;
+            if (i == originalArgc - 2 or (elem.ends_with(stringChar) and elem.at(elem.size() - 2) != '\\'))
+            {
+                finalText += elem.substr(0, elem.size() - elem.ends_with(stringChar));
+                break;
+            }
+
+            arg.c -= 1;
+            finalText += elem + ' ';
+        }
+        
+        if (arg.c == 3)
+        {
+            lineNumberArg = &arg.v.at(originalArgc - 1);
+        }
+    }
+    else 
+    {
+        finalText = textArg;
+    }
+
+    auto& lineNumber = *lineNumberArg;
 
     switch (arg.c)
     {
         case 1:
         {
-            Dir::CreateDirectory(std::to_string(Dir::GetNumberOfDirs()));
+            Dir::CreateDirectory(std::to_string(Dir::GetNumberOfDirs() + 1) + " ...");
         } break;
         case 2:
         {
-            uint64_t    numberOfLines = Dir::GetNumberOfDirs();
-            lineNumberStr = std::to_string(numberOfLines + 1) + " ";
-            Dir::CreateDirectory(textArg.insert(0, lineNumberStr));
+            Dir::CreateDirectory(finalText.insert(0, std::to_string(Dir::GetNumberOfDirs() + 1) + " "));
         } break;
         case 3:
         {
-            if (!zkb::IsInteger(lineNumberArg))
+            if (!zkb::IsInteger(lineNumber))
             {
-                std::cerr << "Not passing an integer for line number\n";
+                std::cerr << "Not passing a positive integer for line number\n";
                 exit(EXIT_FAILURE);
             }
 
-            std::cerr << "basedPath: " << basedPath << '\n';
+            const uint64_t lineNum = std::stoll(lineNumber);
+
+            if (lineNum > Dir::GetNumberOfDirs() + 1 or lineNum == 0)
+            {
+                std::cout << "Line " << lineNumber << " must already exist and be greater than 0.\n";
+                char response;
+
+                std::cout << "Create at last line? y/n: " << std::flush;
+                std::cin  >> response;
+
+                if (std::tolower(response) == 'y')
+                {
+                    Dir::CreateDirectory(finalText.insert(0, std::to_string(Dir::GetNumberOfDirs() + 1) + " "));
+                }
+                return;
+            }
+
             for (auto& elem : fs::directory_iterator(basedPath))
             {
-                auto lineNumber = Dir::GetDirectoryLineNumber(elem.path());
+                auto dirLineNumber = Dir::GetDirectoryLineNumber(elem.path());
 
-                if (lineNumber >= std::stoll(lineNumberArg))
+                if (dirLineNumber >= lineNum)
                 {
-                    Dir::ChangeDirectoryLineNumber(elem, lineNumber + 1);
+                    Dir::ChangeDirectoryLineNumber(elem, dirLineNumber + 1);
                 }
             }
             
-            Dir::CreateDirectory(textArg.insert(0, lineNumberArg += ' '), basedPath);
+            Dir::CreateDirectory(finalText.insert(0, lineNumber += ' '), basedPath);
         } break;
         default: WrongUsage(Command::Line); break;
     }
+
+    // std::cout << "Parent: " << basedPath.parent_path().string() << '\n';
+    // std::cout << "Create " << finalText << " at " << lineNumber << "\n";
 }
 
 void
@@ -403,20 +457,20 @@ CommandHandler::HandleUndo()
     bool repeat = arg.v.at(1) == "all";
     repeat = true;
 
-    while (!history.empty())
-    {
+    // while (!history.empty())
+    // {
         Dir::HistoryT& historyV = history.top();
         
         arg.v = historyV.args.v;
         arg.c = historyV.args.c;
 
-        basedPath = historyV.path.string();
+        basedPath = std::move(historyV.path);
     
         HandleNewLine();
         history.pop();
-        if (!repeat) break;
-    }
-    basedPath = fs::current_path();
+        // if (!repeat) break;
+    // }
+    // basedPath = fs::current_path();
 }
 
 void

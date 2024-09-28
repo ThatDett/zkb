@@ -1,0 +1,38 @@
+$       - text
+#       - number
+(1#,2#) - range from 1# to #2 including both bounds
+(,)     - range from 1  to number of lines
+
+* - Not implemented
+
+Repeat
+    # command args... - repeat command with args # times
+
+New line [l|line]
+    l     - New line with blank filename
+    l $   - New line with $ filename
+    l $ # - New line at # with $ filename. (Other lines with number >= # are moved over)
+
+Delete line [d|delete]
+    d          - Delete last line.
+    d #        - Delete line #.
+    d (1#,#2)  - Delete range.
+    -d args... - To force delete blocks of codes (directories with directories or files inside).
+
+Change line [c|change]
+    c $ #        - Change line # text to $
+    c 1# 2#      - Change line 2# text to line 1# text
+    c 1# (2#,3#) - Change lines 2# - 3# text to 1# text. *
+
+Undo line [u|undo]
+    u - Undo last change. *
+
+Redo line [r|redo]
+    r - Redo last change. *
+
+Fix block [fix]
+    fix - Fix current block's lines. *
+
+ls - List lines in current directory/code block
+
+cd - Change directory

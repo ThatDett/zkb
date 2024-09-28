@@ -29,10 +29,10 @@ auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
 }
 
 bool
-Directory::CreateDirectory(String name, fs::path path)
+Directory::CreateDirectory(String name, const fs::path& path)
 {
-    const fs::path _path = path.string() + '\\' + name;
-    std::cerr << "Creating " << name << " as " << _path.string() << "...\n\n";
+    const fs::path _path = path.string() + '\\' + name + '\\';
+    std::cerr << "Creating " << name << " as " << _path.string() << "\\...\n\n";
     return fs::create_directory(_path);
 }
 
@@ -61,7 +61,8 @@ Directory::RecursivelyDelete(zkb::DirEntry dir, bool save)
         const auto& filename   = GetDirectoryName(dir);
 
         std::cerr << "Pushing " << dir.path() << '\n';
-        std::cerr << "remove " << dir.path().string() << "\n\n";
+        std::cerr << "remove " << dir.path().string() << "\n";
+        std::cerr << "My parent: " << dir.path().parent_path() << "\n\n";
 
         history.push(HistoryT
             {
@@ -106,14 +107,14 @@ Directory::GetNumberOfDirs()
     return numberOfDirs;
 }
 
-constexpr uint64_t
+uint64_t
 Directory::GetDirectoryLineNumber(Path path)
 {
     String dir = path.filename().string();
     return std::stoi(dir.substr(0, dir.find(' ')));
 }
 
-constexpr std::string
+std::string
 Directory::GetDirectoryName(Path path)
 {
     String dir = path.filename().string();
@@ -124,14 +125,16 @@ void
 Directory::ChangeDirectoryLineNumber(DirEntry elem, uint64_t number)
 {
     if (!elem.is_directory()) return;
-    const auto& fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
-    const auto& path        = fs::current_path().string() + "\\" + fullDirName;
 
+    const auto& fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
+    const auto& path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
+    
     std::error_code err;
     fs::rename(elem.path(), path, err);
     if (err)
     {
         std::cerr << "Can't change directory number\n";
+        return;
     }
 }
 

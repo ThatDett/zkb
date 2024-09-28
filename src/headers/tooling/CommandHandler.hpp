@@ -14,7 +14,7 @@ public:
 
     void Handle();
 
-    static constexpr int MAX_ARGS = 5;
+    static constexpr int MAX_ARGS = 16;
     using ArgvT = std::array<std::string, MAX_ARGS>;
     struct ArgT
     {
@@ -31,6 +31,9 @@ public:
 
     static void WrongUsage(Command, bool crash = false);
 
+public:
+    static std::filesystem::path basedPath;
+
 private:
     void HandleNewLine();
     void HandleLineDelete(bool forceDelete = false);
@@ -46,7 +49,6 @@ private:
 
     void DebugRefresh();
 private:
-    std::filesystem::path basedPath;
 };
 
 #endif
