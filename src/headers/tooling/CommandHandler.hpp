@@ -3,18 +3,17 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <filesystem>
 
 class CommandHandler
 {
 public:
-
     CommandHandler();
 
-    void Handle();
-
-    static constexpr int MAX_ARGS = 16;
+public:
+    static constexpr int MAX_ARGS = 24;
     using ArgvT = std::array<std::string, MAX_ARGS>;
     struct ArgT
     {
@@ -22,12 +21,22 @@ public:
         uint32_t c;
     } arg;
 
+    struct RangeT
+    {
+        std::array<std::string, 2> text;
+        std::array<uint32_t,    2> num{0, 1};
+    };
+
     enum class Command
     {
         Line,
         Remove,
+        Change,
         None
     };
+
+public:
+    bool Handle();
 
     static void WrongUsage(Command, bool crash = false);
 
@@ -35,6 +44,7 @@ public:
     static std::filesystem::path basedPath;
 
 private:
+
     void HandleNewLine();
     void HandleLineDelete(bool forceDelete = false);
     void HandleLineChange();
@@ -42,13 +52,20 @@ private:
     void HandleRedo();
 
     void ShowStatus();
+    void GetDirInfo();
     void ListCurrentDirectory();
 
     void ChangeDirectory(const std::filesystem::path&);
     void ChangeDirectory(const uint64_t& lineNumber);
 
+    bool ParseStringText(std::string& textArg, std::string*& lineNumberArg);
+    bool ParseRange(const std::string&, RangeT&);
+    void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
+
     void DebugRefresh();
 private:
+    RangeT range;
+    bool   isRangedDelete;
 };
 
 #endif

@@ -31,8 +31,8 @@ auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
 bool
 Directory::CreateDirectory(String name, const fs::path& path)
 {
-    const fs::path _path = path.string() + '\\' + name + '\\';
-    std::cerr << "Creating " << name << " as " << _path.string() << "\\...\n\n";
+    const fs::path _path = path.string() + '\\' + name;
+    std::cerr << "Creating " << name << " as " << _path.string() << " ...\n\n";
     return fs::create_directory(_path);
 }
 

@@ -1,7 +1,5 @@
-#include <cstdlib>
+#include <cstring>
 #include <iostream>
-#include <string>
-#include <array>
 
 #include "Application.hpp"
 #include "CommandHandler.hpp"
@@ -12,16 +10,16 @@ Application::Application(char** _argv, int _argc) :
 {
     if (argc == 1)
     {
-        RunTooling();
+        //Run tooling
+        CommandHandler();
     }
-}
-
-void Application::RunTooling()
-{
-    CommandHandler handler;
+    else if (std::string(argv[1]) == "build")
+    {
+        Build();
+    }
 }
 
 void Application::Build()
 {
-
+    std::cerr << "Not implemented.\n";
 }
