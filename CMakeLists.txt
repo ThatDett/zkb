@@ -8,10 +8,11 @@ set(tool
 
 set(FILE_SOURCES 
     main.cpp 
-    src/Utils.cpp
+    src/Application.cpp
     ${tool}CommandHandler.cpp
     ${tool}Directory.cpp
-    src/Application.cpp
+    src/Utils.cpp
+    src/Helper.cpp
 )
 
 set(CMAKE_CXX_STANDARD 20)
@@ -21,16 +22,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Define optimization flags based on build type
 if(${DEBUG_BUILD} EQUAL 1)
-    add_compile_options(-O0)
-    add_compile_options(-g)
+    add_compile_options(-O0 -g)
 else(${DEBUG_BUILD} EQUAL 0)
-    add_compile_options(-O2)
+    add_compile_options(-O3)
 endif()
+
 
 configure_file (src/headers/other/CMakeVariables.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/headers/other/CMakeVariables.h @ONLY)
 add_executable(${PROJECT_NAME} ${FILE_SOURCES})
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall)
-
+add_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 #add_subdirectory(external/glfw)
 
 target_include_directories(${PROJECT_NAME} 

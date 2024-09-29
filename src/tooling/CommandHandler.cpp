@@ -1,19 +1,22 @@
-#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <functional>
+
 #include <iostream>
+#include <functional>
 #include <filesystem>
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <array>
 #include <vector>
 
+#include "other/CMakeVariables.h"
 #include "CommandHandler.hpp"
 #include "Directory.hpp"
 #include "Utils.hpp"
+#include "Helper.hpp"
 
 namespace fs = std::filesystem;
 using    Dir = zkb::Directory;
@@ -23,6 +26,11 @@ namespace zkb
     class Error 
     {
     public:
+        static bool NoRootDirectory(const fs::path& path)
+        {
+            return path.string().size() <= 3;
+        }
+
         static bool NonExistantLine(uint64_t lineNumber)
         {
             if (lineNumber <= 0 || lineNumber > Dir::GetNumberOfDirs())
@@ -69,10 +77,50 @@ CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
     if (crash) exit(EXIT_FAILURE);
 }
 
+void 
+CommandHandler::WrongUsage(Setup setupError, bool crash /* = false*/)
+{
+    switch (setupError)
+    {
+        case Setup::RootDirectory:
+        {
+            std::cerr << "No root directory!!!\n";
+            zkb::Helper::RootDirectory();
+        } break;
+        default:
+        {
+            std::cerr << "Wrong Usage\n";
+        } break;
+    }
+    if (crash) exit(EXIT_FAILURE);
+}
+
 fs::path CommandHandler::basedPath = fs::current_path();
+fs::path CommandHandler::rootPath  = CommandHandler::basedPath;
 
 CommandHandler::CommandHandler()
 {
+    while (true)
+    {
+        if (zkb::Error::NoRootDirectory(rootPath))
+        {
+            WrongUsage(Setup::RootDirectory);
+            return;
+        }
+
+        const auto& rootStr  = rootPath.filename().string();
+
+        auto commaPos = rootStr.find('.');
+        if (commaPos != std::string::npos)
+        {
+            if (rootStr.substr(commaPos, 4) == ".zkb")
+            {
+                break;
+            }
+        }
+        rootPath = rootPath.parent_path();
+    }
+
     std::string command;
     bool quit = false;
     
@@ -103,8 +151,6 @@ CommandHandler::CommandHandler()
 
         quit = Handle();
     }
-
-    std::cerr << "Exiting...\n";
 }
 
 bool
@@ -118,7 +164,7 @@ CommandHandler::Handle()
         //If not, arg.v.at(0) is not actually the commandStr, so we need to shift everything
         repetionNumber = std::stoll(commandStr);
         uint32_t originalArgC = arg.c;
-        for (int i = 0; i < originalArgC - 1; i += 1)
+        for (uint32_t i = 0; i < originalArgC - 1; i += 1)
         {
             arg.v.at(i) = std::move(arg.v.at(i + 1));
         }
@@ -127,7 +173,7 @@ CommandHandler::Handle()
 
     zkb::ToLower(commandStr);
 
-    bool forceCommand = commandStr.at(0) == '-';
+    forceCommand = commandStr.at(0) == '-';
     if (forceCommand)
         commandStr    = commandStr.substr(1, commandStr.size());
 
@@ -146,7 +192,7 @@ CommandHandler::Handle()
 
     if (checkCommand({"q", "quit", "exit"})) return true;
 
-    auto evaluate = [&]()
+    auto evaluate = [&]() -> void(CommandHandler::*)()
     {
         std::cerr << "Command: ";
         for (const auto& arg : arg.v)
@@ -155,39 +201,52 @@ CommandHandler::Handle()
         }
         std::cerr << "\nargc = " << arg.c << '\n';
 
+        using CH = CommandHandler;
         if (checkCommand({"l", "line"}))
         {
-            HandleNewLine();
+            return &CH::HandleNewLine;
         }
         else if (checkCommand({"d", "delete"}))
         {
-            HandleLineDelete(forceCommand);
+            return &CH::HandleLineDelete;
         }
         else if (checkCommand({"c", "change"}))
         {
-            HandleLineChange();
+            return &CH::HandleLineChange;
         }
         else if (checkCommand({"u", "undo"}))
         {
-            HandleUndo();
+            return &CH::HandleUndo;
         }
         else if (checkCommand({"r", "redo"}))
         {
-            HandleRedo();
+            return &CH::HandleRedo;
         }
         else if (checkCommand({"s", "status"}))
         {
-            ShowStatus();
+            return &CH::ShowStatus;
         }
-        else if (checkCommand({"info"}))
+        else
         {
-            GetDirInfo();
+            return nullptr;
         }
-        else if (checkCommand({"ls"}))
-        {
-            ListCurrentDirectory();
-        }
-        else if (checkCommand({"cd"}))
+    };
+
+    auto func = evaluate();
+    if (func == nullptr)
+    {
+        repetionNumber = 0;
+    }
+
+    for (uint32_t i = 0; i < repetionNumber; i += 1)
+    {
+        std::invoke(func, this);
+    }
+
+    if (repetionNumber == 0)
+    {
+        //Non repeatable commands
+        if (checkCommand({"cd"}))
         {
             if (zkb::IsInteger(arg.v.at(1)))
                 ChangeDirectory(std::stoll(arg.v.at(1)));
@@ -202,17 +261,26 @@ CommandHandler::Handle()
         {
             Dir::RecursivelyDelete(fs::directory_entry(fs::current_path()), false);
         }
-        else
+        else if (checkCommand({"info"}))
+        {
+            GetDirInfo();
+        }
+        else if (checkCommand({"ls"}))
+        {
+            ListCurrentDirectory();
+        }
+#if DEBUG_BUILD
+        else if (checkCommand({"b"}))
+        {
+            Command command = static_cast<Command>(std::stoi(arg.v.at(1)));
+            Benchmark(command, {arg.v.at(2), arg.v.at(3), arg.v.at(4), arg.v.at(5)});
+        }
+#endif
+        else 
         {
             WrongUsage(Command::None);
         }
-    };
-
-    for (int i = 0; i < repetionNumber; i += 1)
-    {
-        evaluate();
     }
-
 
     std::cout << fs::current_path().string() << "> ";
     return false;
@@ -289,7 +357,7 @@ CommandHandler::HandleNewLine()
 }
 
 void
-CommandHandler::HandleLineDelete(bool forceDelete)
+CommandHandler::HandleLineDelete()
 {
     zkb::String lineNumberArg = arg.v.at(1);
     const auto& numberOfDirs  = Dir::GetNumberOfDirs();
@@ -357,7 +425,7 @@ CommandHandler::HandleLineDelete(bool forceDelete)
 
     for (const auto& elem : Dir::PathIterator())
     {
-        if (!fs::is_empty(elem) && !forceDelete)
+        if (!fs::is_empty(elem) && !forceCommand)
         {
             std::cerr << "Trying to delete a non-empty directory."
                 "To confirm command use [-d|-delete].\n";
@@ -467,7 +535,7 @@ CommandHandler::HandleUndo()
     }
 
     bool repeat = arg.v.at(1) == "all";
-    repeat = true;
+    // repeat = true;
 
     // while (!history.empty())
     // {
@@ -674,3 +742,52 @@ CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesyste
         }
     }
 }
+
+#if DEBUG_BUILD
+void 
+CommandHandler::Benchmark(Command command, const std::array<std::string, 4>& arr)
+{
+    std::vector<double> markings;
+
+    const auto& timesToRepeat = arr.at(0);
+    const auto& numberOfLines = arr.at(1);
+
+    markings.reserve(std::stoi(timesToRepeat));
+    switch (command)
+    {
+        case Command::Line:
+        {
+            for (uint32_t i = 0; i < std::stoi(timesToRepeat); i += 1)
+            {
+                arg.c = 3;
+                arg.v.at(0) = numberOfLines;
+                arg.v.at(1) = "l";
+                arg.v.at(2) = "test";
+
+                const auto start{std::chrono::steady_clock::now()};
+                Handle();
+                const auto end{std::chrono::steady_clock::now()};
+                const std::chrono::duration<double> elapsed_seconds{end - start};
+                markings.push_back(elapsed_seconds.count());
+
+                arg.c = 2;
+                arg.v.at(0) = "-d";
+                arg.v.at(1) = "(,)";
+                HandleLineDelete();
+            }
+        } break;
+        default:
+        {
+        } break;
+    }
+
+    double average = 0;
+    for (const auto& elem : markings)
+    {
+        average += elem;
+    }
+    average /= std::stoi(timesToRepeat);
+
+    std::cerr << "Average time took: " << average << '\n';
+}
+#endif

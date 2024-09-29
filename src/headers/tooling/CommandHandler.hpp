@@ -7,6 +7,8 @@
 #include <string>
 #include <filesystem>
 
+#include "other/CMakeVariables.h"
+
 class CommandHandler
 {
 public:
@@ -35,18 +37,25 @@ public:
         None
     };
 
+    enum class Setup
+    {
+        RootDirectory,
+    };
+
 public:
     bool Handle();
 
     static void WrongUsage(Command, bool crash = false);
+    static void WrongUsage(Setup, bool   crash = false);
 
 public:
     static std::filesystem::path basedPath;
+    static std::filesystem::path rootPath;
 
 private:
 
     void HandleNewLine();
-    void HandleLineDelete(bool forceDelete = false);
+    void HandleLineDelete();
     void HandleLineChange();
     void HandleUndo();
     void HandleRedo();
@@ -63,9 +72,14 @@ private:
     void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
 
     void DebugRefresh();
+
+#if DEBUG_BUILD
+    void Benchmark(Command, const std::array<std::string, 4>&);
+#endif
 private:
     RangeT range;
     bool   isRangedDelete;
+    bool   forceCommand;
 };
 
 #endif
