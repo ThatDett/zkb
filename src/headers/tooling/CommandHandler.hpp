@@ -32,8 +32,13 @@ public:
     enum class Command
     {
         Line,
-        Remove,
+        Delete,
         Change,
+        Move,
+        Undo,
+        Redo,
+        LS,
+        CD,
         None
     };
 
@@ -57,6 +62,7 @@ private:
     void HandleNewLine();
     void HandleLineDelete();
     void HandleLineChange();
+    void HandleLineMove();
     void HandleUndo();
     void HandleRedo();
 
@@ -67,19 +73,29 @@ private:
     void ChangeDirectory(const std::filesystem::path&);
     void ChangeDirectory(const uint64_t& lineNumber);
 
-    bool ParseStringText(std::string& textArg, std::string*& lineNumberArg);
-    bool ParseRange(const std::string&, RangeT&);
+    bool ParseStringText(std::string& textArg);
+    bool ParseRange();
     void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
 
     void DebugRefresh();
 
 #if DEBUG_BUILD
     void Benchmark(Command, const std::array<std::string, 4>&);
+
 #endif
 private:
-    RangeT range;
-    bool   isRangedDelete;
-    bool   forceCommand;
+    bool benchmark;
+
+    RangeT  range;
+
+    //Final text of the string
+    std::string        finalText;
+
+    //Points to the actual line number in string args
+    const std::string* lineNumberPtr;
+    bool               isRanged;
+    bool               forceCommand;
+    Command            lastCommand = Command::None;
 };
 
 #endif

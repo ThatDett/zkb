@@ -41,6 +41,10 @@ Redo line [r|redo]
 Fix block [fix]
     fix - Fix current block's lines. *
 
-ls - List lines in current directory/code block
+List command
+    ls   - List lines in current directory/code block in ascending order. (slower) !
+    -ls  - List lines in current directory/code block in non-specifying order. (faster) !
+    ls # - List line # !
+    ls $ - List line with name $ *
 
 cd - Change directory

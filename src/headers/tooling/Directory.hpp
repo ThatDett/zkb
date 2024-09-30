@@ -43,7 +43,7 @@ namespace zkb
         static auto RemoveDirectory(DirEntry)
             -> bool;
 
-        static auto PathIterator(fs::path = fs::current_path())
+        static auto PathIterator(fs::path = CommandHandler::basedPath)
             -> fs::directory_iterator;
         
     public:
