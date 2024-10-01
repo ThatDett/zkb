@@ -124,18 +124,16 @@ Directory::GetDirectoryName(Path path)
 void
 Directory::ChangeDirectoryLineNumber(DirEntry elem, uint64_t number)
 {
-    if (!elem.is_directory()) return;
-
-    const auto& fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
-    const auto& path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
+    auto fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
+    auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
     
-    std::error_code err;
-    fs::rename(elem.path(), path, err);
-    if (err)
-    {
-        std::cerr << "Can't change directory number\n";
-        return;
-    }
+    // std::error_code err;
+    fs::rename(elem.path(), path);
+    // if (err)
+    // {
+    //     std::cerr << "Can't change directory number\n";
+    //     return;
+    // }
 }
 
 auto

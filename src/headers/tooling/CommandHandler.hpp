@@ -29,9 +29,11 @@ public:
         std::array<uint32_t,    2> num{0, 1};
     };
 
+public:
     enum class Command
     {
         Line,
+        SetLine,
         Delete,
         Change,
         Move,
@@ -53,6 +55,8 @@ public:
     static void WrongUsage(Command, bool crash = false);
     static void WrongUsage(Setup, bool   crash = false);
 
+private:
+    void ShowBasedPath();
 public:
     static std::filesystem::path basedPath;
     static std::filesystem::path rootPath;
@@ -60,6 +64,7 @@ public:
 private:
 
     void HandleNewLine();
+    void SetCurrentLine();
     void HandleLineDelete();
     void HandleLineChange();
     void HandleLineMove();
@@ -70,12 +75,12 @@ private:
     void GetDirInfo();
     void ListCurrentDirectory();
 
-    void ChangeDirectory(const std::filesystem::path&);
-    void ChangeDirectory(const uint64_t& lineNumber);
+    void ChangeDirectory();
 
     bool ParseStringText(std::string& textArg);
-    bool ParseRange();
+    bool ParseRange(Command);
     void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
+    void GenericDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
 
     void DebugRefresh();
 
@@ -84,15 +89,14 @@ private:
 
 #endif
 private:
-    bool benchmark;
-
     RangeT  range;
+    uint64_t currentLine = 1;
 
     //Final text of the string
     std::string        finalText;
-
     //Points to the actual line number in string args
-    const std::string* lineNumberPtr;
+    const std::string* lineNumberPtr = nullptr;
+
     bool               isRanged;
     bool               forceCommand;
     Command            lastCommand = Command::None;

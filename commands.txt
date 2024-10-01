@@ -15,20 +15,25 @@ New line [l|line] - Implemented !
     l $   - New line with $ filename.
     l $ # - New line at # with $ filename. (Other lines with number >= # are moved over)
 
+Set line [sl]
+    sl   - Set current line to one past the number of lines
+    sl # - Set current line to #
+
 Delete line [d|delete] !
-    d          - Delete last line.
+    d          - Delete current line.
     d #        - Delete line #.
     d (1#,#2)  - Delete range.
     -d args... - To force delete blocks of codes (directories with directories or files inside).
 
 Change line [c|change]
-    c $          - Change last line to $. !
+    c $          - Change current line to $. *
     c $ #        - Change line # text to $. !
     c 1# 2#      - Change line 2# text to line 1# text. !
     c 1# (2#,3#) - Change lines 2# - 3# text to 1# text. *
     c $  (1#,2#) - Change lines 1# - 2# text to $. **
 
 Move line [m|move]
+    m 1#         - Swap current line with #1 *
     m 1# 2#      - Swap line 2# with 1#. *
     m 1# (#2,#3) - Move range block to line 1#. *
 
@@ -41,10 +46,13 @@ Redo line [r|redo]
 Fix block [fix]
     fix - Fix current block's lines. *
 
-List command
+List command [ls]
     ls   - List lines in current directory/code block in ascending order. (slower) !
     -ls  - List lines in current directory/code block in non-specifying order. (faster) !
     ls # - List line # !
     ls $ - List line with name $ *
 
-cd - Change directory
+Change directory [cd] !
+    cd # - Change current directory to line #
+    cd $ - Chance current directory to path $
+    
