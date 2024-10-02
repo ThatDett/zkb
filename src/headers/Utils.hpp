@@ -7,8 +7,11 @@
 namespace zkb
 {
     bool IsInteger(const std::string&);
+
     void ToLower(std::string&);
     std::string ToLower(const std::string&);
+
+    int Sign(int);
 }
 
 #endif

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stack>
 #include <string>
+#include <utility>
 
 #include "Directory.hpp"
 #include "CommandHandler.hpp"
@@ -26,6 +27,63 @@ auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
     GetNumberOfDirs() << " directories.\n";
 
     return fs::directory_entry{"null"};
+}
+
+std::pair<fs::directory_entry, fs::directory_entry>
+Directory::DirectoriesInLines(const std::pair<uint64_t, uint64_t>& lines) 
+{
+    const auto& firstLine  = lines.first;
+    const auto& secondLine = lines.second;
+
+    fs::directory_entry first;
+    fs::directory_entry second;
+
+    for (auto& elem : PathIterator())
+    {
+        if (!elem.is_directory()) break;
+
+        uint64_t dirLineNumber = GetDirectoryLineNumber(elem);
+        if (dirLineNumber == firstLine)
+        {
+            first = std::move(elem);
+        }
+
+        if (dirLineNumber == secondLine)
+        {
+            second = std::move(elem);
+        }
+
+        if (first.exists() and second.exists())
+        {
+            return std::make_pair(std::move(first), std::move(second));
+        }
+    }
+
+    std::cerr << "Acessing non-existant line numbers " << first <<
+    " in "  << fs::current_path().string() << "\nThis path has "    << 
+    GetNumberOfDirs() << " directories.\n";
+
+    return {fs::directory_entry{"null"}, fs::directory_entry{"null"}};
+}
+
+std::vector<fs::directory_entry>
+Directory::DirectoriesInRange(uint64_t lowerBound, uint64_t upperBound) 
+{
+    std::vector<fs::directory_entry> dirs;
+    dirs.reserve(upperBound - lowerBound + 1);
+
+    for (auto& elem : PathIterator())
+    {
+        if (!elem.is_directory()) break;
+
+        uint64_t dirLineNumber = GetDirectoryLineNumber(elem);
+        if (dirLineNumber >= lowerBound and dirLineNumber <= upperBound)
+        {
+            dirs.emplace_back(std::move(elem));
+        }
+    }
+
+    return dirs;
 }
 
 bool
@@ -128,12 +186,21 @@ Directory::ChangeDirectoryLineNumber(DirEntry elem, uint64_t number)
     auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
     
     // std::error_code err;
-    fs::rename(elem.path(), path);
+    fs::rename(elem.path(), std::move(path));
     // if (err)
     // {
     //     std::cerr << "Can't change directory number\n";
     //     return;
     // }
+}
+
+void
+Directory::ChangeDirectoryName(DirEntry elem, const std::string& newName)
+{
+    auto fullDirName = std::to_string(GetDirectoryLineNumber(elem)) + ' ' + newName;
+    auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
+    
+    fs::rename(elem.path(), std::move(path));
 }
 
 auto

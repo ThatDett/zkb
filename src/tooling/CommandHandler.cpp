@@ -84,6 +84,10 @@ CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
         {
             std::cerr << "Error moving line(s): Wrong usage\n";
         } break;
+        case Command::Swap:
+        {
+            std::cerr << "Error swaping line(s): Wrong usage\n";
+        } break;
         case Command::LS:
         {
             std::cerr << "Error listing line(s): Wrong usage\n";
@@ -288,6 +292,10 @@ CommandHandler::Handle()
         else if (checkCommand({"sl"}))
         {
             SetCurrentLine();
+        }
+        else if (checkCommand({"s", "swap"}))
+        {
+            HandleLineSwap();
         }
         else if (commandStr == "ref")
         {
@@ -618,9 +626,100 @@ CommandHandler::HandleLineChange()
 }
 
 void
-CommandHandler::HandleLineMove()
+CommandHandler::HandleLineSwap()
 {
-    
+    uint64_t targetLine;
+    uint64_t sourceLine;
+
+    lineNumberPtr = &arg.v.at(1);
+    if ((isRanged = ParseRange(Command::Swap)))
+    {
+        if (range.text.at(0) == "-1") return;
+    }
+
+    if (!zkb::IsInteger(arg.v.at(1 + isRanged)))
+    {
+        WrongUsage(Command::Swap);
+        std::cerr << "Not passing a number for source\n";
+        return;
+    }
+
+    const auto& lowerBound = range.num.at(0);
+    const auto& upperBound = range.num.at(1);
+
+    switch (arg.c)
+    {
+        case 2:
+        {
+            sourceLine = std::stoll(arg.v.at(1));
+            if (currentLine == sourceLine) return;
+
+            if (currentLine >= Dir::GetNumberOfDirs() + 1)
+            {
+                WrongUsage(Command::Swap);
+                std::cerr << "Current line is out of range\n";
+                return;
+            }
+
+            targetLine = currentLine;
+
+        } break;
+        case 3:
+        {
+            targetLine = std::stoll(arg.v.at(2));
+            if (!isRanged)
+                sourceLine = std::stoll(arg.v.at(1));
+        } break;
+        default: WrongUsage(Command::Swap); return;
+    }
+
+    if (isRanged)
+    {
+        // std::cerr << "ranged\n";
+        auto dirs = Dir::DirectoriesInRange(lowerBound, upperBound);
+        int64_t numberOfLinesToShift = targetLine - lowerBound;
+
+        if (numberOfLinesToShift > 0)
+        {
+            if (upperBound + numberOfLinesToShift > Dir::GetNumberOfDirs())
+            {
+                std::cerr << "Can't fit!\n";
+                return;
+            }
+
+            auto movingDirs = Dir::DirectoriesInRange(upperBound + 1, upperBound + numberOfLinesToShift);
+            for (const auto& dir : movingDirs)
+            {
+                Dir::ChangeDirectoryLineNumber(dir, Dir::GetDirectoryLineNumber(dir) - dirs.size());
+            }
+        }
+        else
+        {
+            Dir::ChangeDirectoryLineNumber(Dir::DirectoryInLine(targetLine), targetLine + dirs.size() * zkb::Sign(numberOfLinesToShift) * -1);
+        }
+
+        for (const auto& dir : dirs)
+        {
+            uint64_t lineNumber = Dir::GetDirectoryLineNumber(dir);
+            Dir::ChangeDirectoryLineNumber(dir, lineNumber + numberOfLinesToShift);
+        }
+    }
+    else
+    {
+        if (sourceLine > Dir::GetNumberOfDirs())
+        {
+            WrongUsage(Command::Swap);
+            std::cerr << "Source line is out of range\n";
+            return;
+        }
+
+        auto [currentDir, sourceDir] = Dir::DirectoriesInLines(std::make_pair(targetLine, sourceLine));
+        // auto sourceDir  = Dir::DirectoryInLine(sourceLine);
+        auto tempLineNumber   = Dir::GetDirectoryLineNumber(currentDir);
+
+        Dir::ChangeDirectoryLineNumber(currentDir, Dir::GetDirectoryLineNumber(sourceDir));
+        Dir::ChangeDirectoryLineNumber(sourceDir,  tempLineNumber);
+    }
 }
 
 void

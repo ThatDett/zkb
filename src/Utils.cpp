@@ -25,3 +25,9 @@ std::string zkb::ToLower(const std::string& string)
     ToLower(out);
     return out;
 }
+
+int zkb::Sign(int num)
+{
+    if (num == 0) return 0;
+    return num > 0? 1 : -1;
+}

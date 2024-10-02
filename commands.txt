@@ -20,9 +20,9 @@ Set line [sl]
     sl # - Set current line to #
 
 Delete line [d|delete] !
-    d          - Delete current line.
-    d #        - Delete line #.
-    d (1#,#2)  - Delete range.
+    d          - Delete current line. **
+    d #        - Delete line #. **
+    d (1#,#2)  - Delete range. **
     -d args... - To force delete blocks of codes (directories with directories or files inside).
 
 Change line [c|change]
@@ -32,10 +32,12 @@ Change line [c|change]
     c 1# (2#,3#) - Change lines 2# - 3# text to 1# text. *
     c $  (1#,2#) - Change lines 1# - 2# text to $. **
 
-Move line [m|move]
-    m 1#         - Swap current line with #1 *
-    m 1# 2#      - Swap line 2# with 1#. *
-    m 1# (#2,#3) - Move range block to line 1#. *
+Swap line [s|swap]
+    s 1#         - Swap current line with #1 !
+    s 1# 2#      - Swap line 1# with 2#. !
+    s (#1,#2) #3 - Move range block to line 3#. **
+
+Move line [m|move] - todo: moves lines into or out of a block block/directory
 
 Undo line [u|undo]
     u - Undo last change. **

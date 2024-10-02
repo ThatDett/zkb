@@ -37,6 +37,7 @@ public:
         Delete,
         Change,
         Move,
+        Swap,
         Undo,
         Redo,
         LS,
@@ -67,7 +68,7 @@ private:
     void SetCurrentLine();
     void HandleLineDelete();
     void HandleLineChange();
-    void HandleLineMove();
+    void HandleLineSwap();
     void HandleUndo();
     void HandleRedo();
 

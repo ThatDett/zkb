@@ -27,7 +27,13 @@ namespace zkb
     public:
         static auto DirectoryInLine(uint64_t) 
             -> fs::directory_entry;
- 
+
+        static auto DirectoriesInLines(const std::pair<uint64_t, uint64_t>&) 
+            -> std::pair<fs::directory_entry, fs::directory_entry>;
+
+        static auto DirectoriesInRange(uint64_t upperBound, uint64_t lowerBound) 
+            -> std::vector<fs::directory_entry>;
+
         static auto GetDirectoryLineNumber(Path = fs::current_path()) 
             -> uint64_t;
         static auto GetDirectoryName(Path = fs::current_path())       
@@ -36,6 +42,8 @@ namespace zkb
             -> uint64_t;
 
         static void ChangeDirectoryLineNumber(DirEntry, uint64_t offset);
+        static void ChangeDirectoryName(DirEntry, const std::string&);
+
         static void RecursivelyDelete(DirEntry, bool save = true);
 
         static auto CreateDirectory(String, Path = fs::current_path())
