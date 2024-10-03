@@ -91,12 +91,14 @@ private:
 #endif
 private:
     RangeT  range;
-    uint64_t currentLine = 1;
+    uint64_t currentLine    = 1;
+    uint32_t repetionNumber;
+    uint32_t iteration;
 
     //Final text of the string
     std::string        finalText;
     //Points to the actual line number in string args
-    const std::string* lineNumberPtr = nullptr;
+    std::string* lineNumberPtr = nullptr;
 
     bool               isRanged;
     bool               forceCommand;

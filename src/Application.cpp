@@ -8,10 +8,11 @@
 
 namespace fs = std::filesystem;
 
-std::vector<std::string> keywords
+constexpr std::array<const std::string, 2> keywords
 {
     "project", "root"
 };
+
 
 Application::Application(char** _argv, int _argc) :
     argv(_argv), argc(_argc)

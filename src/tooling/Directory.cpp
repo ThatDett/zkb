@@ -169,7 +169,8 @@ uint64_t
 Directory::GetDirectoryLineNumber(Path path)
 {
     String dir = path.filename().string();
-    return std::stoi(dir.substr(0, dir.find(' ')));
+    auto lineNumber = std::stoll(dir.substr(0, dir.find(' ')));
+    return lineNumber;
 }
 
 std::string
