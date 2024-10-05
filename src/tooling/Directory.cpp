@@ -9,18 +9,105 @@
 #include "CommandHandler.hpp"
 
 using Directory = zkb::Directory;
-using String    = zkb::String;
 namespace fs = zkb::fs;
 
-std::stack<Directory::HistoryT> Directory::history = {};
+std::stack<CommandHandler::HistoryT> Directory::history = {};
 
-auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
+Directory::Directory() {};
+
+Directory::Directory(uint32_t lineNumber) :
+    directoryEntry(DirectoryInLine(lineNumber)),
+    lineNumber(lineNumber),
+    name(GetDirectoryName(directoryEntry)),
+    alreadyInitialized(true)
+{}
+
+void
+Directory::Name(const std::string& newName)
 {
+    directoryEntry = ChangeDirectoryName(directoryEntry, newName);
+    this->name     = newName;
+}
+
+const std::string&
+Directory::Name() const
+{
+    return name;
+}
+
+void
+Directory::LineNumber(uint32_t lineNumber)
+{
+    directoryEntry   = ChangeDirectoryLineNumber(directoryEntry, lineNumber);
+    this->lineNumber = lineNumber;
+}
+
+uint32_t
+Directory::LineNumber() const
+{
+    return lineNumber;
+}
+
+void
+Directory::Filename(const std::string& newFileName)
+{
+    directoryEntry = ChangeDirectoryFilename(directoryEntry, newFileName);
+}
+
+std::string
+Directory::Filename() const
+{
+    return directoryEntry.path().filename().string();
+}
+
+fs::directory_entry
+Directory::operator()() const
+{
+    return directoryEntry;
+}
+
+void
+Directory::operator()(uint32_t lineNumber)
+{
+    if (alreadyInitialized)
+    {
+        std::cout << "Directory " << name << " already initialized.\n";
+        return;
+    }
+
+    directoryEntry   = DirectoryInLine(lineNumber);
+    this->lineNumber = lineNumber;
+    name             = GetDirectoryName(directoryEntry);
+}
+
+bool
+Directory::IsInitialized() const
+{
+    return alreadyInitialized;
+}
+
+auto Directory::DirectoryInLine(uint32_t lineNumber) -> fs::directory_entry
+{
+    fs::directory_entry dirInLine;
     for (const auto& elem : PathIterator())
     {
         if (!elem.is_directory()) break;
-        if (GetDirectoryLineNumber(elem) == lineNumber) return elem;
+        if (GetDirectoryLineNumber(elem) == lineNumber)
+        {
+            const auto name = GetDirectoryName(elem);
+            if (name.ends_with("temp"))
+            {
+                return elem;
+            }
+            else
+            {
+                dirInLine = elem;
+            }
+        }
     }
+
+    if (dirInLine.exists())
+        return dirInLine;
 
     std::cerr << "Acessing non-existant line number " << lineNumber <<
     " in "  << fs::current_path().string() << "\nThis path has "    << 
@@ -30,7 +117,7 @@ auto Directory::DirectoryInLine(uint64_t lineNumber) -> fs::directory_entry
 }
 
 std::pair<fs::directory_entry, fs::directory_entry>
-Directory::DirectoriesInLines(const std::pair<uint64_t, uint64_t>& lines) 
+Directory::DirectoriesInLines(const std::pair<uint32_t, uint32_t>& lines) 
 {
     const auto& firstLine  = lines.first;
     const auto& secondLine = lines.second;
@@ -42,7 +129,7 @@ Directory::DirectoriesInLines(const std::pair<uint64_t, uint64_t>& lines)
     {
         if (!elem.is_directory()) break;
 
-        uint64_t dirLineNumber = GetDirectoryLineNumber(elem);
+        uint32_t dirLineNumber = GetDirectoryLineNumber(elem);
         if (dirLineNumber == firstLine)
         {
             first = std::move(elem);
@@ -67,7 +154,7 @@ Directory::DirectoriesInLines(const std::pair<uint64_t, uint64_t>& lines)
 }
 
 std::vector<fs::directory_entry>
-Directory::DirectoriesInRange(uint64_t lowerBound, uint64_t upperBound) 
+Directory::DirectoriesInRange(uint32_t lowerBound, uint32_t upperBound) 
 {
     std::vector<fs::directory_entry> dirs;
     dirs.reserve(upperBound - lowerBound + 1);
@@ -76,7 +163,7 @@ Directory::DirectoriesInRange(uint64_t lowerBound, uint64_t upperBound)
     {
         if (!elem.is_directory()) break;
 
-        uint64_t dirLineNumber = GetDirectoryLineNumber(elem);
+        uint32_t dirLineNumber = GetDirectoryLineNumber(elem);
         if (dirLineNumber >= lowerBound and dirLineNumber <= upperBound)
         {
             dirs.emplace_back(std::move(elem));
@@ -87,31 +174,33 @@ Directory::DirectoriesInRange(uint64_t lowerBound, uint64_t upperBound)
 }
 
 bool
-Directory::CreateDirectory(String name, const fs::path& path)
+Directory::CreateDirectory(const std::string& name, const fs::path& path)
 {
     const fs::path _path = path.string() + '\\' + name;
     std::cerr << "Creating " << name << " as " << _path.string() << " ...\n\n";
+    numberOfDirs += 1;
     return fs::create_directory(_path);
 }
 
 bool
-Directory::RemoveDirectory(zkb::DirEntry dir)
+Directory::RemoveDirectory(const fs::directory_entry& dir)
 {
     const auto& lineNumber = std::to_string(GetDirectoryLineNumber(dir));
     auto filename   = GetDirectoryName(dir);
 
-    history.push(HistoryT
+    history.push(CommandHandler::HistoryT
         {
             {{"l", filename, lineNumber}, 3},
             fs::current_path()
         }
     );
 
+    numberOfDirs -= 1;
     return fs::remove(dir);
 }
 
 void
-Directory::RecursivelyDelete(zkb::DirEntry dir, bool save)
+Directory::RecursivelyDelete(const fs::directory_entry& dir, bool save)
 {
     auto Delete = [dir]()
     {
@@ -122,22 +211,28 @@ Directory::RecursivelyDelete(zkb::DirEntry dir, bool save)
         std::cerr << "remove " << dir.path().string() << "\n";
         std::cerr << "My parent: " << dir.path().parent_path() << "\n\n";
 
-        history.push(HistoryT
+        history.push(CommandHandler::HistoryT
             {
                 {{"l", filename, lineNumber}, 3},
                 dir.path().parent_path()
             }
         );
 
+        numberOfDirs -= 1;
         fs::remove(dir);
     };
 
     if (fs::is_empty(dir))
     {
         if (save) 
+        {
             Delete();
+        }
         else
+        {
+            numberOfDirs -= 1;
             fs::remove(dir);
+        }
         return;
     }
     
@@ -148,60 +243,87 @@ Directory::RecursivelyDelete(zkb::DirEntry dir, bool save)
 
     //Delete parent
     if (save) 
+    {
         Delete();
+    }
     else
+    {
+        numberOfDirs -= 1;
         fs::remove(dir);
+    }
 }
 
-uint64_t 
+bool     Directory::updateNumberOfDirs = true;
+uint32_t Directory::numberOfDirs       = 0;
+
+uint32_t 
 Directory::GetNumberOfDirs()
 {
-    uint64_t numberOfDirs = 0;
-    for (const auto& elem : PathIterator())
+    if (updateNumberOfDirs)
     {
-        if (elem.is_directory()) numberOfDirs += 1;
+        // std::cerr << "Updating number of dirs\n";
+        numberOfDirs = 0;
+        for (const auto& elem : PathIterator())
+        {
+            if (elem.is_directory()) numberOfDirs += 1;
+        }
+        updateNumberOfDirs = false;
     }
+
 
     return numberOfDirs;
 }
 
-uint64_t
-Directory::GetDirectoryLineNumber(Path path)
+uint32_t
+Directory::GetDirectoryLineNumber(const fs::path& path)
 {
-    String dir = path.filename().string();
-    auto lineNumber = std::stoll(dir.substr(0, dir.find(' ')));
+    const std::string dir = path.filename().string();
+    auto lineNumber = std::stoi(dir.substr(0, dir.find_first_of(' ')));
     return lineNumber;
 }
 
 std::string
-Directory::GetDirectoryName(Path path)
+Directory::GetDirectoryName(const fs::path& path)
 {
-    String dir = path.filename().string();
-    return dir.substr(dir.find(' ') + 1, dir.size());
+    const std::string dir = path.filename().string();
+    return dir.substr(dir.find_first_of(' ') + 1, dir.size());
 }
 
-void
-Directory::ChangeDirectoryLineNumber(DirEntry elem, uint64_t number)
+fs::directory_entry
+Directory::ChangeDirectoryLineNumber(const fs::directory_entry& elem, uint32_t number, bool ignoreError)
 {
     auto fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
     auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
     
-    // std::error_code err;
-    fs::rename(elem.path(), std::move(path));
-    // if (err)
-    // {
-    //     std::cerr << "Can't change directory number\n";
-    //     return;
-    // }
+    if (ignoreError)
+    {
+        std::error_code err;
+        fs::rename(elem, path, err);
+    }
+    else
+    {
+        fs::rename(elem, path);
+    }
+    return fs::directory_entry(std::move(path));
 }
 
-void
-Directory::ChangeDirectoryName(DirEntry elem, const std::string& newName)
+fs::directory_entry
+Directory::ChangeDirectoryName(const fs::directory_entry& elem, const std::string& newName)
 {
     auto fullDirName = std::to_string(GetDirectoryLineNumber(elem)) + ' ' + newName;
     auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
     
-    fs::rename(elem.path(), std::move(path));
+    fs::rename(elem, path);
+    return fs::directory_entry(std::move(path));
+}
+
+fs::directory_entry
+Directory::ChangeDirectoryFilename(const fs::directory_entry& elem, const std::string& newName)
+{
+    auto path = elem.path().parent_path().string() + "\\" + newName;
+    
+    fs::rename(elem, path);
+    return fs::directory_entry(std::move(path));
 }
 
 auto

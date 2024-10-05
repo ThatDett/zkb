@@ -1,61 +1,88 @@
 #ifndef DIRECTORY_HPP
 #define DIRECTORY_HPP
 
+#include "CommandHandler.hpp"
 #include <cstdint>
 #include <stack>
 #include <string>
 #include <filesystem>
 
-#include "CommandHandler.hpp"
-
 namespace zkb
 {
     namespace fs   = std::filesystem;
-    using String   = const std::string&;
-    using Path     = const fs::path&;
-    using DirEntry = const fs::directory_entry&;
 
     class Directory
     {
     public:
-        struct HistoryT
-        {
-            CommandHandler::ArgT args;
-            fs::path             path;
-        };
+        Directory();
+        Directory(uint32_t lineNumber);
 
     public:
-        static auto DirectoryInLine(uint64_t) 
+        void Name(const std::string&);
+        auto Name() const
+          -> const std::string&;
+
+        void LineNumber(uint32_t);
+        auto LineNumber() const
+          -> uint32_t;
+
+        void Filename(const std::string&);
+        auto Filename() const
+          -> std::string;
+
+        bool IsInitialized() const;
+
+        auto operator()() const
+          -> fs::directory_entry;
+        void operator()(uint32_t lineNumber);
+    private:
+        fs::directory_entry directoryEntry;
+
+        uint32_t    lineNumber         = 0;
+        std::string name;
+        bool        alreadyInitialized = false;
+
+    public:
+
+    public:
+        static auto DirectoryInLine(uint32_t) 
             -> fs::directory_entry;
 
-        static auto DirectoriesInLines(const std::pair<uint64_t, uint64_t>&) 
+        static auto DirectoriesInLines(const std::pair<uint32_t, uint32_t>&) 
             -> std::pair<fs::directory_entry, fs::directory_entry>;
 
-        static auto DirectoriesInRange(uint64_t upperBound, uint64_t lowerBound) 
+        static auto DirectoriesInRange(uint32_t upperBound, uint32_t lowerBound) 
             -> std::vector<fs::directory_entry>;
 
-        static auto GetDirectoryLineNumber(Path = fs::current_path()) 
-            -> uint64_t;
-        static auto GetDirectoryName(Path = fs::current_path())       
+        static auto GetDirectoryLineNumber(const fs::path& = fs::current_path()) 
+            -> uint32_t;
+        static auto GetDirectoryName(const fs::path& = fs::current_path())       
             -> std::string;
         static auto GetNumberOfDirs() 
-            -> uint64_t;
+            -> uint32_t;
 
-        static void ChangeDirectoryLineNumber(DirEntry, uint64_t offset);
-        static void ChangeDirectoryName(DirEntry, const std::string&);
+        static auto ChangeDirectoryLineNumber(const fs::directory_entry&, uint32_t offset, bool ignoreError = false)
+            -> fs::directory_entry;
+        static auto ChangeDirectoryName(const fs::directory_entry&, const std::string&)
+            -> fs::directory_entry;
+        static auto ChangeDirectoryFilename(const fs::directory_entry&, const std::string&)
+            -> fs::directory_entry;
 
-        static void RecursivelyDelete(DirEntry, bool save = true);
+        static void RecursivelyDelete(const fs::directory_entry&, bool save = true);
 
-        static auto CreateDirectory(String, Path = fs::current_path())
+        static auto CreateDirectory(const std::string&, const fs::path& = fs::current_path())
             -> bool;
-        static auto RemoveDirectory(DirEntry)
+        static auto RemoveDirectory(const fs::directory_entry&)
             -> bool;
 
         static auto PathIterator(fs::path = CommandHandler::basedPath)
             -> fs::directory_iterator;
         
     public:
-        static std::stack<HistoryT> history;
+        static std::stack<CommandHandler::HistoryT> history;
+
+        static uint32_t numberOfDirs;
+        static bool     updateNumberOfDirs;
     };
 }
 

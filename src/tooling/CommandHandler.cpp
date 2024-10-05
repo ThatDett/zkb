@@ -1,15 +1,17 @@
 #include <cassert>
-#if DEBUG_BUILD
-#include <chrono>
-#endif
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 
+#if DEBUG_BUILD
+#include <chrono>
+#endif
 #include <iostream>
 #include <functional>
 #include <filesystem>
 #include <iterator>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <array>
@@ -34,7 +36,7 @@ namespace zkb
             return path.string().size() <= 3;
         }
 
-        static bool NonExistantLine(uint64_t lineNumber)
+        static bool NonExistantLine(uint32_t lineNumber)
         {
             if (lineNumber <= 0 || lineNumber > Dir::GetNumberOfDirs())
             {
@@ -44,7 +46,7 @@ namespace zkb
             return false;
         }
 
-        static bool NonExistantLine(uint64_t lowerBound, uint64_t upperBound)
+        static bool NonExistantLine(uint32_t lowerBound, uint32_t upperBound)
         {
             if (lowerBound <= 0 || upperBound > Dir::GetNumberOfDirs())
             {
@@ -129,8 +131,8 @@ CommandHandler::ShowBasedPath()
 
     while (relevantPath.filename() != rootPath.parent_path().filename())
     {
-        std::string name = relevantPath.filename().string();
-        fs::path parent = relevantPath.parent_path();
+        std::string name   = relevantPath.filename().string();
+        fs::path    parent = relevantPath.parent_path();
 
         relevantPathStr.insert(0, parent == rootPath.parent_path()? std::move(name) : name.insert(0, "/"));
         relevantPath = std::move(parent);
@@ -372,57 +374,40 @@ CommandHandler::HandleNewLine()
                 finalText = std::move(textArg);
             }
         }
-        finalText += ";";
     }
 
-
     static uint32_t nameRepetion = 0;
-    uint64_t numberOfDirs = Dir::GetNumberOfDirs();
 
     std::string& lineNumberArg = *lineNumberPtr;
     std::string finalName;
 
-    auto nameRepetionLookup = [this](std::string& finalName)
+    std::string TEMP = ".temp";
+
+    zkb::Directory dirAtTargetLine;
+    auto checkForSameName = [&]()
     {
-        return;
-        // if (forceCommand) return;
-        // // if (lastCommand == Command::Line)
-        // // {
-        // //     finalName += std::to_string(nameRepetion + iteration).insert(0, " (") + ")";
-        // //     return;
-        // // }
-        //
-        // nameRepetion = 0;
-        // for (const auto& elem : Dir::PathIterator())
-        // {
-        //     const auto& name = Dir::GetDirectoryName(elem);
-        //     if (name.substr(0, name.find(";")) == finalName)
-        //     {
-        //         std::cerr << name.substr(0, name.find(";")) << " repeats\n";
-        //         nameRepetion += 1;
-        //     }
-        //     else
-        //     {
-        //         std::cerr << name.substr(0, name.find(";")) << " doesn't repeat\n";
-        //     }
-        // }
-        //
-        // if (nameRepetion != 0)
-        //     finalName += std::to_string(nameRepetion).insert(0, " (") + ")";
+        if (currentLine > Dir::GetNumberOfDirs()) return;
+        dirAtTargetLine(currentLine);
+        if (dirAtTargetLine.Filename() == finalName)
+        {
+            dirAtTargetLine.Name(finalName.substr(finalName.find_first_of(' ') + 1, finalName.size()) + TEMP);
+        }
     };
 
     switch (arg.c)
     {
         case 1:
         {
-            finalName = std::to_string(currentLine) + " '...';";
-            nameRepetionLookup(finalName);
+            finalName = std::to_string(currentLine) + " '...'";
+            checkForSameName();
+
             Dir::CreateDirectory(finalName);
         } break;
         case 2:
         {
             finalName = std::to_string(currentLine) + " " + finalText;
-            nameRepetionLookup(finalName);
+            checkForSameName();
+
             Dir::CreateDirectory(finalName);
         } break;
         case 3:
@@ -433,8 +418,9 @@ CommandHandler::HandleNewLine()
                 exit(EXIT_FAILURE);
             }
 
-            const uint64_t lineNum = std::stoll(lineNumberArg);
-            if (lineNum > numberOfDirs + 1 or lineNum == 0)
+
+            const uint32_t lineNum = std::stoi(lineNumberArg);
+            if (lineNum > Dir::GetNumberOfDirs() + 1 or lineNum == 0)
             {
                 std::cout << "Line " << lineNumberArg << " must already exist and be greater than 0.\n";
                 char response;
@@ -444,7 +430,7 @@ CommandHandler::HandleNewLine()
 
                 if (std::tolower(response) == 'y')
                 {
-                    Dir::CreateDirectory(std::to_string(numberOfDirs) + " " + finalText);
+                    Dir::CreateDirectory(std::to_string(Dir::GetNumberOfDirs()) + " " + finalText);
                 }
                 return;
             }
@@ -460,8 +446,7 @@ CommandHandler::HandleNewLine()
             else
                 finalName = lineNumberArg + " " + finalText;
 
-            nameRepetionLookup(finalName);
-                
+            checkForSameName();
             Dir::CreateDirectory(finalName, basedPath);
         } break;
         default: WrongUsage(Command::Line); return;
@@ -469,21 +454,43 @@ CommandHandler::HandleNewLine()
 
     if (lastCommand != Command::Line)
     {
-        if (currentLine <= numberOfDirs)
+        if (currentLine <= Dir::GetNumberOfDirs())
         {
-            GenericDirectoryIteration([this, finalName](zkb::DirEntry elem, uint64_t dirLineNumber)
+            GenericDirectoryIteration([&](zkb::Directory dir)
             {
-                if (dirLineNumber >= currentLine && finalName != elem.path().filename().string())
+                // std::cout << "dir.LineNumber() >= currentLine: " << (dir.LineNumber() >= currentLine) << '\n';
+                // std::cout << "dir.Name().ends_with(\"temp\"): " << dir.Name().ends_with(TEMP) << '\n';
+                // std::cout << "finalName != dir.Filename(): " << (finalName != dir.Filename()) << '\n';
+                // std::cout << "finalName: " << finalName << '\n';
+                // std::cout << "dirName: " << dir.Filename() << '\n';
+                if (dir.Name().ends_with(TEMP))
                 {
-                    //If it changes to a name that already exist it will crash
-                    Dir::ChangeDirectoryLineNumber(elem, dirLineNumber + repetionNumber);
+                    std::cout << "Creating new line with current line being the same name as the text argument.\nAccomodating.\n";
+                    dirAtTargetLine.LineNumber(dirAtTargetLine.LineNumber() + repetionNumber);
+                    return;
+                }
+
+                if (dir.LineNumber() >= currentLine && finalName != dir.Filename())
+                {
+                    std::cout << "Change " << dir.Filename() << "\n";
+                    dir.LineNumber(dir.LineNumber() + repetionNumber);
                 }
             });
         }
     }
+
+    //Handle case where the directory at current line is the same name as the new
+    if (dirAtTargetLine.Name().ends_with(TEMP))
+    {
+        const auto& name       = dirAtTargetLine.Name();
+        const auto  revertName = name.substr(0, name.find_last_of(TEMP) - TEMP.size() + 1);
+        dirAtTargetLine.Name(revertName);
+    }
+
     currentLine += 1;
 
     lastCommand = Command::Line;
+    updateDirectoriesList = true;
     // std::cout << "Parent: " << basedPath.parent_path().string() << '\n';
     // std::cout << "Create " << finalText << " at " << lineNumber << "\n";
 }
@@ -491,7 +498,7 @@ CommandHandler::HandleNewLine()
 void
 CommandHandler::SetCurrentLine()
 {
-    uint64_t line;
+    uint32_t line;
     auto numberOfLines = Dir::GetNumberOfDirs();
     switch (arg.c) 
     {
@@ -502,7 +509,7 @@ CommandHandler::SetCurrentLine()
         } break;
         case 2:
         {
-            line = std::stoll(arg.v.at(1));
+            line = std::stoi(arg.v.at(1));
         } break;
         default: WrongUsage(Command::SetLine); return;
     }
@@ -515,13 +522,14 @@ CommandHandler::SetCurrentLine()
     }
 
     currentLine = line;
+    updateDirectoriesList = true;
 }
 
 void
 CommandHandler::HandleLineDelete()
 {
     std::string lineNumberArg       = arg.c > 1? arg.v.at(1) : std::to_string(currentLine);
-    uint64_t    referenceLineNumber = 0;
+    uint32_t    referenceLineNumber = 0;
     const auto  numberOfDirs        = Dir::GetNumberOfDirs();
 
     if (numberOfDirs == 0)
@@ -530,14 +538,13 @@ CommandHandler::HandleLineDelete()
         return;
     }
 
-    lineNumberPtr = &lineNumberArg;
-    if ((isRanged = ParseRange(Command::Delete)))
+    if ((isRanged = ParseRange(lineNumberArg, Command::Delete)))
     {
         if (range.text.at(0) == "-1") return;
     }
 
-    const uint64_t& lowerBound = range.num.at(0);
-    const uint64_t& upperBound = range.num.at(1);
+    const uint32_t& lowerBound = range.num.at(0);
+    const uint32_t& upperBound = range.num.at(1);
 
     if (lowerBound > upperBound)
     {
@@ -550,7 +557,7 @@ CommandHandler::HandleLineDelete()
     dirs.reserve(upperBound - lowerBound + isRanged);
     if (isRanged)
     {
-        RangedDirectoryIteration([&](const fs::directory_entry& elem, uint64_t)
+        RangedDirectoryIteration([&](const fs::directory_entry& elem, uint32_t)
         {
             dirs.emplace_back(std::move(elem));
         });
@@ -562,7 +569,6 @@ CommandHandler::HandleLineDelete()
 
     auto& dir = dirs.at(0);
 
-    lastCommand = Command::Delete;
     switch (arg.c)
     {
         case 1:
@@ -586,7 +592,7 @@ CommandHandler::HandleLineDelete()
                 return;
             }
 
-            referenceLineNumber = std::stoll(lineNumberArg);
+            referenceLineNumber = std::stoi(lineNumberArg);
             dir = Dir::DirectoryInLine(referenceLineNumber);
             std::cerr << "Dir in line is " << dir.path().filename().string() << '\n';
         } break;
@@ -603,7 +609,7 @@ CommandHandler::HandleLineDelete()
         }
     }
 
-    for (uint64_t i = 0; i < upperBound - lowerBound + isRanged; i += 1)
+    for (uint32_t i = 0; i < upperBound - lowerBound + isRanged; i += 1)
     {
         if (fs::is_empty(dirs.at(i))) 
         {
@@ -615,13 +621,16 @@ CommandHandler::HandleLineDelete()
     }
 
     if (upperBound == numberOfDirs) return;
-    GenericDirectoryIteration([&](zkb::DirEntry elem, uint64_t lineNumber)
+    GenericDirectoryIteration([&](zkb::Directory dir)
     {
-        if (lineNumber > (isRanged? upperBound : referenceLineNumber))
+        if (dir.LineNumber() > (isRanged? upperBound : referenceLineNumber))
         {
-            Dir::ChangeDirectoryLineNumber(elem, lineNumber - (upperBound - lowerBound + isRanged));
+            dir.LineNumber(dir.LineNumber() - (upperBound - lowerBound + isRanged));
         }
     });
+
+    lastCommand = Command::Delete;
+    updateDirectoriesList = true;
 }
 
 void
@@ -647,7 +656,7 @@ CommandHandler::HandleLineChange()
     {
         case 2:
         {
-            uint64_t    lineNumber          = Dir::GetNumberOfDirs();
+            uint32_t    lineNumber          = Dir::GetNumberOfDirs();
             std::string lineNumberStr       = std::to_string(lineNumber);
 
             const auto& dir                 = Dir::DirectoryInLine(lineNumber);
@@ -664,7 +673,7 @@ CommandHandler::HandleLineChange()
         } break;
         case 3:
         {
-            if ((isRanged = ParseRange(Command::Change)))
+            if ((isRanged = ParseRange(*lineNumberPtr, Command::Change)))
             {
                 if (range.text.at(0) == "-1") return;
             }
@@ -674,7 +683,7 @@ CommandHandler::HandleLineChange()
 
             if (!isRanged)
             {
-                lowerBound = std::stoll(lineNumberArg);
+                lowerBound = std::stoi(lineNumberArg);
                 upperBound = lowerBound;
             }
 
@@ -687,15 +696,15 @@ CommandHandler::HandleLineChange()
             if (zkb::Error::NonExistantLine(lowerBound, upperBound)) return;
             if (zkb::IsInteger(arg1))
             {
-                RangedDirectoryIteration([arg1](const fs::directory_entry& elem, uint64_t lineNumber)
+                RangedDirectoryIteration([arg1](const fs::directory_entry& elem, uint32_t lineNumber)
                 {
                     const auto& parent = elem.path().parent_path().string();
-                    fs::rename(elem.path(), parent + "\\" + std::to_string(lineNumber) + ' ' + Dir::GetDirectoryName(Dir::DirectoryInLine(std::stoll(arg1))));
+                    fs::rename(elem.path(), parent + "\\" + std::to_string(lineNumber) + ' ' + Dir::GetDirectoryName(Dir::DirectoryInLine(std::stoi(arg1))));
                 });
             }
             else
             {
-                RangedDirectoryIteration([arg1, this](const fs::directory_entry& elem, uint64_t lineNumber)
+                RangedDirectoryIteration([arg1, this](const fs::directory_entry& elem, uint32_t lineNumber)
                 {
                     const auto& parent = elem.path().parent_path().string();
                     fs::rename(elem.path(), parent + "\\" + (std::to_string(lineNumber) + ' ') + finalText);
@@ -708,27 +717,30 @@ CommandHandler::HandleLineChange()
             return;
         }
     }
+    updateDirectoriesList = true;
 }
 
 void
 CommandHandler::HandleLineSwap()
 {
-    uint64_t targetLine{};
-    uint64_t sourceLine{};
+    uint32_t targetLine{};
+    uint32_t sourceLine{};
     auto numberOfLines = Dir::GetNumberOfDirs();
 
-    lineNumberPtr = &arg.v.at(1);
-    if ((isRanged = ParseRange(Command::Swap)))
+    if ((isRanged = ParseRange(arg.v.at(1), Command::Swap)))
     {
         if (range.text.at(0) == "-1") return;
     }
-
-    if (!zkb::IsInteger(arg.v.at(1 + isRanged)))
+    else
     {
-        WrongUsage(Command::Swap);
-        std::cerr << "Not passing a number for source\n";
-        return;
+        if (!zkb::IsInteger(arg.v.at(1)))
+        {
+            WrongUsage(Command::Swap);
+            std::cerr << "Not passing a number for source\n";
+            return;
+        }
     }
+
 
     const auto& lowerBound = range.num.at(0);
     const auto& upperBound = range.num.at(1);
@@ -737,7 +749,7 @@ CommandHandler::HandleLineSwap()
     {
         case 2:
         {
-            sourceLine = std::stoll(arg.v.at(1));
+            sourceLine = std::stoi(arg.v.at(1));
             if (currentLine == sourceLine) return;
 
             targetLine = currentLine;
@@ -745,9 +757,16 @@ CommandHandler::HandleLineSwap()
         } break;
         case 3:
         {
-            targetLine = std::stoll(arg.v.at(2));
+            if (!zkb::IsInteger(arg.v.at(2)))
+            {
+                WrongUsage(Command::Swap);
+                std::cerr << "Not passing a number for target\n";
+                return;
+            }
+
+            targetLine = std::stoi(arg.v.at(2));
             if (!isRanged)
-                sourceLine = std::stoll(arg.v.at(1));
+                sourceLine = std::stoi(arg.v.at(1));
         } break;
         default: WrongUsage(Command::Swap); return;
     }
@@ -782,7 +801,7 @@ CommandHandler::HandleLineSwap()
 
                     arg.c = 1;
                     arg.v.at(0) = "l";
-                    for (uint64_t i = (upperBound + numberOfLinesToShift) - numberOfLines; i > 0; i -= 1)
+                    for (uint32_t i = (upperBound + numberOfLinesToShift) - numberOfLines; i > 0; i -= 1)
                         HandleNewLine();
 
                     currentLine = tempCurrentLine;
@@ -803,7 +822,7 @@ CommandHandler::HandleLineSwap()
         auto dirs = Dir::DirectoriesInRange(lowerBound, upperBound);
         for (const auto& dir : dirs)
         {
-            uint64_t lineNumber = Dir::GetDirectoryLineNumber(dir);
+            uint32_t lineNumber = Dir::GetDirectoryLineNumber(dir);
             Dir::ChangeDirectoryLineNumber(dir, lineNumber + numberOfLinesToShift);
         }
 
@@ -822,14 +841,33 @@ CommandHandler::HandleLineSwap()
             return;
         }
 
-        auto [currentDir, sourceDir] = Dir::DirectoriesInLines(std::make_pair(targetLine, sourceLine));
+        auto [targetDir, sourceDir] = Dir::DirectoriesInLines(std::make_pair(targetLine, sourceLine));
         // auto sourceDir  = Dir::DirectoryInLine(sourceLine);
-        auto tempLineNumber   = Dir::GetDirectoryLineNumber(currentDir);
 
-        Dir::ChangeDirectoryLineNumber(currentDir, Dir::GetDirectoryLineNumber(sourceDir));
-        Dir::ChangeDirectoryLineNumber(sourceDir,  tempLineNumber);
+        std::string targetDirName         = Dir::GetDirectoryName(targetDir);
+        bool        accomodateForSameName = targetDirName == Dir::GetDirectoryName(sourceDir);
+
+        if (accomodateForSameName)
+        {
+            if (fs::is_empty(targetDir) and fs::is_empty(sourceDir)) return;
+
+            if constexpr (DEBUG_BUILD)
+                std::cout << "Equal name, acommodating\n";
+
+            targetDir = Dir::ChangeDirectoryName(targetDir, targetDirName + ".d");
+        }
+
+        targetDir = Dir::ChangeDirectoryLineNumber(targetDir, sourceLine, accomodateForSameName);
+        Dir::ChangeDirectoryLineNumber(sourceDir, targetLine, accomodateForSameName);
+
+        if (accomodateForSameName)
+        {
+            Dir::ChangeDirectoryName(targetDir, targetDirName);
+        }
     }
+
     lastCommand = Command::Swap;
+    updateDirectoriesList = true;
 }
 
 void
@@ -847,7 +885,7 @@ CommandHandler::HandleUndo()
 
     // while (!history.empty())
     // {
-        Dir::HistoryT& historyV = history.top();
+        HistoryT& historyV = history.top();
         
         arg.v = historyV.args.v;
         arg.c = historyV.args.c;
@@ -883,7 +921,7 @@ CommandHandler::GetDirInfo()
         return;
     }
 
-    const auto& dir = Dir::DirectoryInLine(std::stoll(arg.v.at(1)));
+    const auto& dir = Dir::DirectoryInLine(std::stoi(arg.v.at(1)));
 
     std::cout << "Text: "         << Dir::GetDirectoryName(dir) << '\n';
     std::cout << "Is directory: " << fs::is_directory(dir)      << '\n';
@@ -893,36 +931,70 @@ CommandHandler::GetDirInfo()
 void 
 CommandHandler::ListCurrentDirectory()
 {
+    //Could make this faster
+    static std::ostringstream output;
     // const auto start{std::chrono::steady_clock::now()};
     std::cout << '\n';
     switch (arg.c)
     {
         case 1:
         {
-            uint64_t lineNumber = 1;
             if (fs::is_empty(basedPath))
             {
-                std::cout << "\t\t\t\tNumber of lines: 0" << '\n';
+                std::cout << "\t\t\t\t> [New line]\n\t\t\t\tNumber of lines: 0" << '\n';
                 return;
             }
 
-            for (const auto& dir : Dir::PathIterator())
+            if (true or updateDirectoriesList)
             {
-                uint64_t dirLineNumber = Dir::GetDirectoryLineNumber(dir);
-                if (dirLineNumber == lineNumber or forceCommand)
-                    std::cout << "\t\t\t\t" << dir.path().filename().string() << '\n';
-                else
+                std::ostringstream().swap(output);
+                uint32_t lineNumber = 1;
+
+                auto streamOut = [&](auto dir)
                 {
-                    for (const auto& dir : Dir::PathIterator())
+                    output << "\t\t\t\t";
+                    if (currentLine == lineNumber)
                     {
-                        uint64_t otherdirLineNumber = Dir::GetDirectoryLineNumber(dir);
-                        if (otherdirLineNumber == lineNumber)
-                            std::cout << "\t\t\t\t" << dir.path().filename().string() << '\n';
+                        output << "> ";
                     }
+                    else
+                    {
+                        output << "  ";
+                    }
+
+                     output << dir.path().filename().string() << '\n';
+                };
+
+                for (const auto& dir : Dir::PathIterator())
+                {
+                    uint32_t dirLineNumber = Dir::GetDirectoryLineNumber(dir);
+                    if (dirLineNumber == lineNumber or forceCommand)
+                        streamOut(dir);
+                    else
+                    {
+                        for (const auto& dir : Dir::PathIterator())
+                        {
+                            uint32_t otherdirLineNumber = Dir::GetDirectoryLineNumber(dir);
+                            if (otherdirLineNumber == lineNumber)
+                            {
+                                streamOut(dir);
+                            }
+                        }
+                    }
+                    lineNumber += 1;
                 }
-                lineNumber += 1;
+
+                if (forceCommand)  output << "\t\t\t\t" << "Number of lines: " << Dir::GetNumberOfDirs();
+
+                if (currentLine > Dir::GetNumberOfDirs())
+                {
+                    output << "\t\t\t\t> [New line]\n";
+                }
+
+                updateDirectoriesList = false;
             }
-            std::cout << "\t\t\t\t"; ShowStatus();
+
+            std::cout << output.str();
         } break;
         case 2:
         {
@@ -933,7 +1005,7 @@ CommandHandler::ListCurrentDirectory()
 
             if (zkb::IsInteger(arg.v.at(1)))
             {
-                const auto& dir = Dir::DirectoryInLine(std::stoll(arg.v.at(1)));
+                const auto& dir = Dir::DirectoryInLine(std::stoi(arg.v.at(1)));
                 std::cout << "\t\t\t\t" << dir.path().filename().string() << "\n";
             }
             else
@@ -982,7 +1054,7 @@ CommandHandler::ChangeDirectory()
         {
             if (zkb::IsInteger(arg.v.at(1)))
             {
-                path = Dir::DirectoryInLine(std::stoll(arg.v.at(1)));
+                path = Dir::DirectoryInLine(std::stoi(arg.v.at(1)));
                 break;
             }
 
@@ -998,14 +1070,15 @@ CommandHandler::ChangeDirectory()
     }
 
     fs::current_path(path);
+    Dir::updateNumberOfDirs = true;
     basedPath = path;
     currentLine = 1;
 }
 
 void CommandHandler::DebugRefresh()
 {
-    // uint64_t lineOfNonexistantDir = 0;
-    // for (uint64_t line = 1; line < Dir::GetNumberOfDirs(); line += 1)
+    // uint32_t lineOfNonexistantDir = 0;
+    // for (uint32_t line = 1; line < Dir::GetNumberOfDirs(); line += 1)
     // {
     //     std::cerr << "line = " << line << "\nlineOfNon = " << lineOfNonexistantDir << '\n';
     //     const auto dir = Dir::DirectoryInLine(line);
@@ -1014,7 +1087,7 @@ void CommandHandler::DebugRefresh()
     //         if (line <= lineOfNonexistantDir) continue;
     //         for (auto& elem : Dir::PathIterator())
     //         {
-    //             uint64_t lineNumber = Dir::GetDirectoryLineNumber(elem);
+    //             uint32_t lineNumber = Dir::GetDirectoryLineNumber(elem);
     //             if (lineNumber <= line - lineOfNonexistantDir) continue;
     //
     //             std::cerr << "original: " << lineNumber << "\nnew: " << lineNumber - (line - lineOfNonexistantDir + 1);
@@ -1073,9 +1146,11 @@ CommandHandler::ParseStringText(std::string& textArg)
 }
 
 bool
-CommandHandler::ParseRange(Command command)
+CommandHandler::ParseRange(std::string& lineNumberArg, Command command)
 {
-    const auto& string = *lineNumberPtr;
+    lineNumberPtr      = &lineNumberArg;
+    const auto& string =  lineNumberArg;
+
     if (!string.starts_with('(') or !string.ends_with(')'))
     {
         range.num.at(0) = 0;
@@ -1145,7 +1220,7 @@ CommandHandler::ParseRange(Command command)
     for (int i = 0; i < 2; i += 1)
     {
         // std::cerr << "inside\n";
-        range.num.at(i) = std::stoll(range.text.at(i));
+        range.num.at(i) = std::stoi(range.text.at(i));
         if (zkb::Error::NonExistantLine(range.num.at(i)))
         {
             std::cerr << "Error at ranged delete\n";
@@ -1157,7 +1232,7 @@ CommandHandler::ParseRange(Command command)
 }
 
 void
-CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)> func)
+CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint32_t)> func)
 {
     const auto& lowerBound = range.num.at(0);
     const auto& upperBound = range.num.at(1);
@@ -1168,7 +1243,7 @@ CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesyste
     {
         if (!fs::is_directory(elem)) continue;
 
-        uint64_t dirLineNumber = Dir::GetDirectoryLineNumber(elem);
+        uint32_t dirLineNumber = Dir::GetDirectoryLineNumber(elem);
         if (dirLineNumber >= lowerBound && dirLineNumber <= upperBound)
         {
             func(elem, dirLineNumber);
@@ -1176,13 +1251,12 @@ CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesyste
     }
 }
 void
-CommandHandler::GenericDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)> func)
+CommandHandler::GenericDirectoryIteration(std::function<void(zkb::Directory)> func)
 {
-    for (const auto& elem : fs::directory_iterator{basedPath})
+    for (const auto& elem : Dir::PathIterator())
     {
         if (!fs::is_directory(elem)) continue;
-
-        func(elem, Dir::GetDirectoryLineNumber(elem));
+        func(Dir::GetDirectoryLineNumber(elem));
     }
 }
 
@@ -1277,3 +1351,5 @@ CommandHandler::Benchmark(Command command, const std::array<std::string, 4>& arr
     }
 }
 #endif
+
+

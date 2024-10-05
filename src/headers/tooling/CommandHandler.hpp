@@ -9,6 +9,11 @@
 
 #include "other/CMakeVariables.h"
 
+namespace zkb 
+{
+    class Directory;
+}
+
 class CommandHandler
 {
 public:
@@ -22,6 +27,12 @@ public:
         ArgvT    v;
         uint32_t c;
     } arg;
+
+    struct HistoryT
+    {
+        ArgT   args;
+        std::filesystem::path  path;
+    };
 
     struct RangeT
     {
@@ -79,9 +90,9 @@ private:
     void ChangeDirectory();
 
     bool ParseStringText(std::string& textArg);
-    bool ParseRange(Command);
-    void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
-    void GenericDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint64_t)>);
+    bool ParseRange(std::string& , Command);
+    void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint32_t)>);
+    void GenericDirectoryIteration(std::function<void(zkb::Directory)>);
 
     void DebugRefresh();
 
@@ -91,7 +102,7 @@ private:
 #endif
 private:
     RangeT  range;
-    uint64_t currentLine    = 1;
+    uint32_t currentLine    = 1;
     uint32_t repetionNumber;
     uint32_t iteration;
 
@@ -103,6 +114,8 @@ private:
     bool               isRanged;
     bool               forceCommand;
     Command            lastCommand = Command::None;
+
+    bool updateDirectoriesList = true;
 };
 
 #endif
