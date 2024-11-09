@@ -3,6 +3,7 @@
 
 #include "CommandHandler.hpp"
 #include <cstdint>
+#include <span>
 #include <stack>
 #include <string>
 #include <filesystem>
@@ -15,7 +16,7 @@ namespace zkb
     {
     public:
         Directory();
-        Directory(uint32_t lineNumber);
+        Directory(fs::directory_entry);
 
     public:
         void Name(const std::string&);
@@ -45,7 +46,7 @@ namespace zkb
     public:
 
     public:
-        static auto DirectoryInLine(uint32_t) 
+        static auto DirectoryInLine(uint32_t, std::span<const char*> namesToAvoid = std::span<const char*>{}) 
             -> fs::directory_entry;
 
         static auto DirectoriesInLines(const std::pair<uint32_t, uint32_t>&) 

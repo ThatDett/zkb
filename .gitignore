@@ -2,3 +2,6 @@
 build/
 .cache/
 TODO.txt
+latex/
+html/
+zkb_docs

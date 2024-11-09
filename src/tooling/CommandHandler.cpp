@@ -360,8 +360,6 @@ CommandHandler::Handle()
 void 
 CommandHandler::HandleNewLine()
 {
-    //TODO: Make this more efficient on repeat, don't need to update the directories by 1
-    // could just update by repetion amount
     std::string& textArg       = arg.v.at(1);
 
     if (lastCommand != Command::Line)
@@ -379,19 +377,28 @@ CommandHandler::HandleNewLine()
     static uint32_t nameRepetion = 0;
 
     std::string& lineNumberArg = *lineNumberPtr;
+
+    //Final directory name
     std::string finalName;
 
-    std::string TEMP = ".temp";
+    constexpr static std::string TEMP = ".temp";
 
-    zkb::Directory dirAtTargetLine;
-    auto checkForSameName = [&]()
+    bool solveTemporaries = false;
+    auto checkForSameName = [&](const std::string nameToCheck, uint32_t referentialLineNumber)
     {
-        if (currentLine > Dir::GetNumberOfDirs()) return;
-        dirAtTargetLine(currentLine);
-        if (dirAtTargetLine.Filename() == finalName)
+        if (referentialLineNumber > Dir::GetNumberOfDirs()) return;
+        GenericDirectoryIteration([&](zkb::Directory dir)
         {
-            dirAtTargetLine.Name(finalName.substr(finalName.find_first_of(' ') + 1, finalName.size()) + TEMP);
-        }
+            if (dir.LineNumber() >= referentialLineNumber)
+            {
+                const auto& checkName = nameToCheck.substr(nameToCheck.find_first_of(' ') + 1, nameToCheck.size() - nameToCheck.find_first_of(' ') + 1);
+                if (dir.Name() == checkName)
+                {
+                    solveTemporaries = true;
+                    dir.Name(nameToCheck.substr(nameToCheck.find_first_of(' ') + 1, nameToCheck.size()) + TEMP + std::to_string(dir.LineNumber()));
+                }
+            }
+        });
     };
 
     switch (arg.c)
@@ -399,14 +406,14 @@ CommandHandler::HandleNewLine()
         case 1:
         {
             finalName = std::to_string(currentLine) + " '...'";
-            checkForSameName();
+            checkForSameName(finalName, currentLine);
 
             Dir::CreateDirectory(finalName);
         } break;
         case 2:
         {
             finalName = std::to_string(currentLine) + " " + finalText;
-            checkForSameName();
+            checkForSameName(finalName, currentLine);
 
             Dir::CreateDirectory(finalName);
         } break;
@@ -446,7 +453,7 @@ CommandHandler::HandleNewLine()
             else
                 finalName = lineNumberArg + " " + finalText;
 
-            checkForSameName();
+            checkForSameName(finalName, currentLine);
             Dir::CreateDirectory(finalName, basedPath);
         } break;
         default: WrongUsage(Command::Line); return;
@@ -454,25 +461,27 @@ CommandHandler::HandleNewLine()
 
     if (lastCommand != Command::Line)
     {
+        // std::cout << Dir::GetNumberOfDirs() << '\n';
         if (currentLine <= Dir::GetNumberOfDirs())
         {
             GenericDirectoryIteration([&](zkb::Directory dir)
             {
-                // std::cout << "dir.LineNumber() >= currentLine: " << (dir.LineNumber() >= currentLine) << '\n';
                 // std::cout << "dir.Name().ends_with(\"temp\"): " << dir.Name().ends_with(TEMP) << '\n';
                 // std::cout << "finalName != dir.Filename(): " << (finalName != dir.Filename()) << '\n';
                 // std::cout << "finalName: " << finalName << '\n';
                 // std::cout << "dirName: " << dir.Filename() << '\n';
-                if (dir.Name().ends_with(TEMP))
-                {
-                    std::cout << "Creating new line with current line being the same name as the text argument.\nAccomodating.\n";
-                    dirAtTargetLine.LineNumber(dirAtTargetLine.LineNumber() + repetionNumber);
-                    return;
-                }
+                // if (dir.Name().find(TEMP) != std::string::npos)
+                // {
+                //     std::cout << "Creating new line with current line being the same name as the text argument.\nAccomodating.\n";
+                //     dir.LineNumber(dir.LineNumber() + repetionNumber);
+                //     return;
+                // }
 
+                // std::cout << dir.Filename() << '\n';
                 if (dir.LineNumber() >= currentLine && finalName != dir.Filename())
                 {
                     std::cout << "Change " << dir.Filename() << "\n";
+                    checkForSameName(dir.Name(), dir.LineNumber() + repetionNumber);
                     dir.LineNumber(dir.LineNumber() + repetionNumber);
                 }
             });
@@ -480,11 +489,17 @@ CommandHandler::HandleNewLine()
     }
 
     //Handle case where the directory at current line is the same name as the new
-    if (dirAtTargetLine.Name().ends_with(TEMP))
+    if (solveTemporaries)
     {
-        const auto& name       = dirAtTargetLine.Name();
-        const auto  revertName = name.substr(0, name.find_last_of(TEMP) - TEMP.size() + 1);
-        dirAtTargetLine.Name(revertName);
+        GenericDirectoryIteration([&](zkb::Directory dir)
+        {
+            if (dir.Name().find(TEMP) != std::string::npos)
+            {
+                const auto& name       = dir.Name();
+                const auto  revertName = name.substr(0, name.find(TEMP));
+                dir.Name(std::move(revertName));
+            }
+        });
     }
 
     currentLine += 1;
@@ -611,6 +626,7 @@ CommandHandler::HandleLineDelete()
 
     for (uint32_t i = 0; i < upperBound - lowerBound + isRanged; i += 1)
     {
+        currentLine -= currentLine > 1;
         if (fs::is_empty(dirs.at(i))) 
         {
             Dir::RemoveDirectory(dirs.at(i));
@@ -1043,12 +1059,14 @@ CommandHandler::ListCurrentDirectory()
 void
 CommandHandler::ChangeDirectory()
 {
+    const auto& pathArg = arg.v.at(1);
     fs::path path;
+
     switch (arg.c)
     {
         case 1:
         {
-            
+            path = Dir::DirectoryInLine(currentLine).path();
         } break;
         case 2:
         {
@@ -1058,13 +1076,28 @@ CommandHandler::ChangeDirectory()
                 break;
             }
 
-            if (path.string().at(1) != ':' && !path.string().starts_with('.'))
+            if (pathArg.at(1) != ':' && !pathArg.starts_with('.'))
             {
                 std::cerr << "Path doesn't exist\n";
                 return;
             }
 
-            path = arg.v.at(1);
+            //TODO: Parse path to get the right directory. i.e ../test goes one back and the to test
+            if (pathArg == "..")
+            {
+                if (basedPath.string().ends_with(".zkb"))
+                {
+                    std::cout << "Already at root directory\n";
+                    return;
+                }
+                else
+                {
+                    path = basedPath.parent_path();
+                    break;
+                }
+            }
+
+            path = pathArg;
         } break;
         default: WrongUsage(Command::CD); return;
     }
@@ -1256,7 +1289,7 @@ CommandHandler::GenericDirectoryIteration(std::function<void(zkb::Directory)> fu
     for (const auto& elem : Dir::PathIterator())
     {
         if (!fs::is_directory(elem)) continue;
-        func(Dir::GetDirectoryLineNumber(elem));
+        func(elem);
     }
 }
 

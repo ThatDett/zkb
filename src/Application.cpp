@@ -1,4 +1,3 @@
-#include <vector>
 #include <iostream>
 #include <string_view>
 
@@ -36,7 +35,7 @@ Application::Application(char** _argv, int _argc) :
     if (argc == 1)
     {
         //Run tooling
-        CommandHandler();
+        (void)CommandHandler();
         std::cout << "Exiting...\n";
         return;
     }
@@ -61,11 +60,18 @@ Application::Application(char** _argv, int _argc) :
     }
 }
 
+/**
+ * Build function responsible to compile zkb
+ */
 void Application::Build()
 {
     std::cerr << "Not implemented.\n";
 }
 
+/**
+ * test
+ * @param str String stuff
+ */
 void Application::PrintHelp(const std::string_view str)
 {
     if (str == "project")

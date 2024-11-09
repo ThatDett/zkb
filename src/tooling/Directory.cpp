@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <span>
 #include <stack>
 #include <string>
 #include <utility>
@@ -15,12 +16,14 @@ std::stack<CommandHandler::HistoryT> Directory::history = {};
 
 Directory::Directory() {};
 
-Directory::Directory(uint32_t lineNumber) :
-    directoryEntry(DirectoryInLine(lineNumber)),
-    lineNumber(lineNumber),
+Directory::Directory(fs::directory_entry dirEntry) :
+    directoryEntry(std::move(dirEntry)),
+    lineNumber(GetDirectoryLineNumber(directoryEntry)),
     name(GetDirectoryName(directoryEntry)),
     alreadyInitialized(true)
-{}
+{
+    // std::cout << directoryEntry.path().string() << '\n';
+}
 
 void
 Directory::Name(const std::string& newName)
@@ -86,12 +89,20 @@ Directory::IsInitialized() const
     return alreadyInitialized;
 }
 
-auto Directory::DirectoryInLine(uint32_t lineNumber) -> fs::directory_entry
+auto Directory::DirectoryInLine(uint32_t lineNumber, std::span<const char*> namesToAvoid) -> fs::directory_entry
 {
     fs::directory_entry dirInLine;
     for (const auto& elem : PathIterator())
     {
         if (!elem.is_directory()) break;
+        for (const auto& nameToAvoid : namesToAvoid)
+        {
+            if (GetDirectoryName(elem) == nameToAvoid)
+            {
+                continue;
+            }
+        }
+
         if (GetDirectoryLineNumber(elem) == lineNumber)
         {
             const auto name = GetDirectoryName(elem);
@@ -177,7 +188,7 @@ bool
 Directory::CreateDirectory(const std::string& name, const fs::path& path)
 {
     const fs::path _path = path.string() + '\\' + name;
-    std::cerr << "Creating " << name << " as " << _path.string() << " ...\n\n";
+    std::cerr << "Creating " << name /*<< " as " << _path.string()*/ << "\n\n";
     numberOfDirs += 1;
     return fs::create_directory(_path);
 }
@@ -295,15 +306,16 @@ Directory::ChangeDirectoryLineNumber(const fs::directory_entry& elem, uint32_t n
     auto fullDirName = std::to_string(number) + ' ' + GetDirectoryName(elem.path());
     auto path        = CommandHandler::basedPath.string() + "\\" + fullDirName;
     
-    if (ignoreError)
-    {
+    // if (ignoreError)
+    // {
         std::error_code err;
+        // fs::rename(elem, path, err);
+    // }
+    // else
+    // {
         fs::rename(elem, path, err);
-    }
-    else
-    {
-        fs::rename(elem, path);
-    }
+        // std::cout << err.message() << '\n';
+    // }
     return fs::directory_entry(std::move(path));
 }
 
