@@ -15,7 +15,7 @@ New line [l|line] - Implemented !
     l $   - New line with $ filename.
     l $ # - New line at # with $ filename.
 
-Set line [sl]
+Set line [sl] !
     sl   - Set current line to one past the number of lines
     sl # - Set current line to #
 
@@ -26,7 +26,7 @@ Delete line [d|delete] !
     -d args... - To force delete blocks of codes (directories with directories or files inside).
 
 Change line [c|change]
-    c $          - Change current line to $. *
+    c $          - Change current line to $. !
     c $ #        - Change line # text to $. !
     c 1# 2#      - Change line 2# text to line 1# text. !
     c 1# (2#,3#) - Change lines 2# - 3# text to 1# text. *

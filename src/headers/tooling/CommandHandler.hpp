@@ -90,7 +90,11 @@ private:
     void ChangeDirectory();
 
     bool ParseStringText(std::string& textArg);
-    bool ParseRange(std::string& , Command);
+    bool ParseRange(std::string&, Command);
+
+    //For changing directories
+    bool ParsePath(const std::string&);
+
     void RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint32_t)>);
     void GenericDirectoryIteration(std::function<void(zkb::Directory)>);
 

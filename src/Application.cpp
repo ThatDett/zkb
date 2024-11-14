@@ -1,3 +1,5 @@
+#include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <string_view>
 
@@ -87,4 +89,9 @@ void Application::PrintHelp(const std::string_view str)
     {
         zkb::Helper::RootDirectory();
     }
+}
+
+void Application::Exit(uint32_t errorCode)
+{
+    exit(errorCode);
 }

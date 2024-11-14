@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #include <array>
 #include <vector>
 
+#include "Application.hpp"
 #include "other/CMakeVariables.h"
 #include "CommandHandler.hpp"
 #include "Directory.hpp"
@@ -25,6 +27,8 @@
 
 namespace fs = std::filesystem;
 using    Dir = zkb::Directory;
+
+#define DEBUG_OUT(x) if constexpr (DEBUG_BUILD) { std::cout << x << '\n'; }
 
 namespace zkb
 {
@@ -99,7 +103,7 @@ CommandHandler::WrongUsage(Command command, bool crash /* = false*/)
             std::cerr << "Wrong Usage\n";
         } break;
     }
-    if (crash) exit(EXIT_FAILURE);
+    if (crash) Application::Exit(EXIT_FAILURE);
 }
 
 void 
@@ -117,7 +121,7 @@ CommandHandler::WrongUsage(Setup setupError, bool crash /* = false*/)
             std::cerr << "Wrong Usage\n";
         } break;
     }
-    if (crash) exit(EXIT_FAILURE);
+    if (crash) Application::Exit(EXIT_FAILURE);
 }
 
 fs::path CommandHandler::basedPath = fs::current_path();
@@ -180,7 +184,7 @@ CommandHandler::CommandHandler()
             if (arg.c >= CommandHandler::MAX_ARGS)
             {
                 std::cerr << "Too many args. argc = " << arg.c << "\n";
-                exit(EXIT_FAILURE);
+                Application::Exit(EXIT_FAILURE);
             }
             
             const auto& subStr = command.substr(wordBeg, pos - wordBeg);
@@ -322,7 +326,7 @@ CommandHandler::Handle()
         }
         else if (checkCommand({"s", "swap"}))
         {
-                HandleLineSwap();
+            HandleLineSwap();
         }
         else if (commandStr == "ref")
         {
@@ -342,6 +346,11 @@ CommandHandler::Handle()
         }
 #if DEBUG_BUILD
         else if (checkCommand({"b"}))
+        {
+            std::system("b");
+            Application::Exit();
+        }
+        else if (checkCommand({"bn"}))
         {
             Command command = static_cast<Command>(std::stoi(arg.v.at(1)));
             Benchmark(command, {arg.v.at(2), arg.v.at(3), arg.v.at(4), arg.v.at(5)});
@@ -383,8 +392,14 @@ CommandHandler::HandleNewLine()
 
     constexpr static std::string TEMP = ".temp";
 
+    /*
+     * When a line updates to accomodate for a new line it might be the case that they have
+     * the exact same filename: 1 example | 2 example -> 2 example | 2 example, 
+     * therefore we append some text to the filename so conflict doesn't happen:
+     * 2 example.temp1 | 2 example.
+     */
     bool solveTemporaries = false;
-    auto checkForSameName = [&](const std::string nameToCheck, uint32_t referentialLineNumber)
+    auto checkForSameName = [&](const std::string& nameToCheck, uint32_t referentialLineNumber)
     {
         if (referentialLineNumber > Dir::GetNumberOfDirs()) return;
         GenericDirectoryIteration([&](zkb::Directory dir)
@@ -422,7 +437,7 @@ CommandHandler::HandleNewLine()
             if (!zkb::IsInteger(lineNumberArg))
             {
                 std::cerr << "Not passing a positive integer for line number\n";
-                exit(EXIT_FAILURE);
+                Application::Exit(EXIT_FAILURE);
             }
 
 
@@ -672,10 +687,9 @@ CommandHandler::HandleLineChange()
     {
         case 2:
         {
-            uint32_t    lineNumber          = Dir::GetNumberOfDirs();
-            std::string lineNumberStr       = std::to_string(lineNumber);
+            std::string lineNumberStr       = std::to_string(currentLine);
 
-            const auto& dir                 = Dir::DirectoryInLine(lineNumber);
+            const auto& dir                 = Dir::DirectoryInLine(currentLine);
             const auto& parent              = dir.path().parent_path().string();
 
             const auto& saveName = Dir::GetDirectoryName(dir).insert(0, "\"") + '"';
@@ -1059,52 +1073,58 @@ CommandHandler::ListCurrentDirectory()
 void
 CommandHandler::ChangeDirectory()
 {
-    const auto& pathArg = arg.v.at(1);
-    fs::path path;
+    auto& pathArg      = arg.v.at(1);
+    fs::path finalPath = ParsePath(pathArg);
 
     switch (arg.c)
     {
         case 1:
         {
-            path = Dir::DirectoryInLine(currentLine).path();
+            if (currentLine > Dir::GetNumberOfDirs())
+            {
+                return;
+            }
+
+            fs::current_path(Dir::DirectoryInLine(currentLine).path());
         } break;
         case 2:
         {
             if (zkb::IsInteger(arg.v.at(1)))
             {
-                path = Dir::DirectoryInLine(std::stoi(arg.v.at(1)));
+                fs::current_path(Dir::DirectoryInLine(std::stoi(arg.v.at(1))));
                 break;
             }
 
-            if (pathArg.at(1) != ':' && !pathArg.starts_with('.'))
-            {
-                std::cerr << "Path doesn't exist\n";
-                return;
-            }
+            // if (finalText.at(1) != ':' && !pathArg.starts_with('.'))
+            // {
+            //     std::cerr << "Path doesn't exist\n";
+            //     return;
+            // }
 
             //TODO: Parse path to get the right directory. i.e ../test goes one back and the to test
-            if (pathArg == "..")
-            {
-                if (basedPath.string().ends_with(".zkb"))
-                {
-                    std::cout << "Already at root directory\n";
-                    return;
-                }
-                else
-                {
-                    path = basedPath.parent_path();
-                    break;
-                }
-            }
+            // if (pathArg == "..")
+            // {
+            //     if (basedPath.string().ends_with(".zkb"))
+            //     {
+            //         std::cout << "Already at root directory\n";
+            //         return;
+            //     }
+            //     else
+            //     {
+            //         // path = basedPath.parent_path();
+            //         // break;
+            //     }
+            // }
 
-            path = pathArg;
+            // path = pathArg;
+            fs::current_path(finalText);
         } break;
         default: WrongUsage(Command::CD); return;
     }
 
-    fs::current_path(path);
+    // fs::current_path(path);
     Dir::updateNumberOfDirs = true;
-    basedPath = path;
+    basedPath   = fs::current_path();
     currentLine = 1;
 }
 
@@ -1135,10 +1155,15 @@ bool
 CommandHandler::ParseStringText(std::string& textArg)
 {
     static constexpr char stringChar = '"';
+    if (arg.c < 3)
+    {
+        DEBUG_OUT("2 args, not parsing");
+        return false;
+    }
+
     if (zkb::IsInteger(textArg) || !textArg.starts_with('"'))
     {
-        if constexpr (DEBUG_BUILD)
-            std::cerr << "Can't parse string\n";
+        DEBUG_OUT("Can't parse string");
         return false;
     }
 
@@ -1264,6 +1289,53 @@ CommandHandler::ParseRange(std::string& lineNumberArg, Command command)
     return true;
 }
 
+//TODO: Finish this
+bool
+CommandHandler::ParsePath(const std::string& rawPath)
+{
+    fs::path iterationPath = basedPath;
+    std::vector<std::function<void()>> executionList;
+    executionList.reserve(8);
+
+    auto oneBack = [iterationPath]() mutable
+    {
+        iterationPath = iterationPath.parent_path();
+    };
+
+    for (uint32_t i = 0; i < rawPath.length(); i += 1)
+    {
+        const auto& c = rawPath.at(i);
+        if (c == '/')
+        {
+            continue;
+        }
+
+        if (rawPath.substr(i, 3) == "../")
+        {
+            iterationPath = iterationPath.parent_path();
+        }
+        else if (std::isdigit(c))
+        {
+            auto directoryNumber = rawPath.substr(i, rawPath.find('/', i));
+            if (!zkb::IsInteger(directoryNumber))
+            {
+                std::cout << "Can't find path\n";
+                return false;
+            }
+        }
+        else
+        {
+            std::cout << "Malformed path\n";
+            return false;
+        }
+
+    }
+}
+
+/*
+ * TODO:
+ * Change function args to Directory class instead of directory entry and line size
+ */
 void
 CommandHandler::RangedDirectoryIteration(std::function<void(const std::filesystem::directory_entry&, uint32_t)> func)
 {
